@@ -1,0 +1,95 @@
+# This is the template file for creating symbols with tragesym						
+# every line starting with '#' is a comment line.						
+# save it as text file with tab separated cells and start tragesym						
+						
+[options]						
+# wordswap swaps labels if the pin is on the right side an looks like this:						
+#   "PB1 (CLK)". That's useful for micro controller port labels						
+# rotate_labels rotates the pintext of top and bottom pins						
+#   this is useful for large symbols like FPGAs with more than 100 pins						
+# sort_labels will sort the pins by it's labels						
+#   useful for address ports, busses, ...						
+wordswap	no					
+rotate_labels	no					
+sort_labels	no					
+generate_pinseq	yes					
+sym_width	2400					
+pinwidthvertical	200					
+pinwidthhorizontal	400					
+						
+[geda_attr]						
+# name will be printed in the top of the symbol						
+# if you have a device with slots, you'll have to use slot= and slotdef=						
+# use comment= if there are special information you want to add						
+version	20060113 1					
+name	ATMega32					
+device	ATMega32					
+refdes	U?					
+footprint	DIP40					
+description	ATMega32					
+documentation	none					
+author	rp9					
+numslots	0					
+#slot	1					
+#slotdef	1:					
+#slotdef	2:					
+#slotdef	3:					
+#slotdef	4:					
+#comment						
+#comment						
+#comment						
+						
+[pins]						
+# tabseparated list of pin descriptions						
+#						
+# pinnr is the physical number of the pin						
+# seq is the pinseq= attribute, leave it blank if it doesn't matter						
+# type can be (in, out, io, oc, oe, pas, tp, tri, clk, pwr)						
+# style can be (line,dot,clk,dotclk,none). none if only want to add a net						
+# posit. can be (l,r,t,b) or empty for nets						
+# net specifies the name of the net. Vcc or GND for example.						
+# label represents the pinlabel.						
+#	negation lines can be added with "\_" example: \_enable\_ 					
+#	if you want to write a "\" use "\\" as escape sequence					
+#						
+#pinnr	seq	type	style	posit.	net	label
+1	1	Io	Line	L		PB0 (XCK/T0)
+2	2	Io	Line	L		PB1 (T1)
+3	3	Io	Line	L		PB2 (INT2/AIN0)
+4	4	Io	Line	L		PB3 (OC0/AIN1)
+5	5	Io	Line	L		PB4 (SS)
+6	6	Io	Line	L		PB5 (MOSI)
+7	7	Io	Line	L		PB6 (MISO)
+8	8	Io	Line	L		PB7 (SCK)
+9	9	Io	Line	L		RESET
+10	10	Io	Line	L		VCC
+11	11	Io	Line	L		GND
+12	12	Io	Line	L		XTAL2
+13	13	Io	Line	L		XTAL1
+14	14	Io	Line	L		PD0 (RXD)
+15	15	Io	Line	L		PD1 (TXD)
+16	16	Io	Line	L		PD2 (INT0)
+17	17	Io	Line	L		PD3 (INT1)
+18	18	Io	Line	L		PD4 (OC1B)
+19	19	Io	Line	L		PD5 (OC1A)
+20	20	Io	Line	L		PD6 (ICP1)
+40	40	Io	Line	R		(ADC0) PA0
+39	39	Io	Line	R		(ADC1) PA1
+38	38	Io	Line	R		(ADC2) PA2
+37	37	Io	Line	R		(ADC3) PA3
+36	36	Io	Line	R		(ADC4) PA4
+35	35	Io	Line	R		(ADC5) PA5
+34	34	Io	Line	R		(ADC6) PA6
+33	33	Io	Line	R		(ADC7) PA7
+32	32	Io	Line	R		AREF
+31	31	Io	Line	R		GND
+30	30	Io	Line	R		AVCC
+29	29	Io	Line	R		(TOSC2) PC7
+28	28	Io	Line	R		(TOSC1) PC6
+27	27	Io	Line	R		(TDI) PC5
+26	26	Io	Line	R		(TDO) PC4
+25	25	Io	Line	R		(TMS) PC3
+24	24	Io	Line	R		(TCK) PC2
+23	23	Io	Line	R		(SDA) PC1
+22	22	Io	Line	R		(SCL) PC0
+21	21	Io	Line	R		(OC2) PD7
