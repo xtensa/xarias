@@ -224,10 +224,39 @@ uint32_t power(uint32_t x, uint8_t y)
  */
 #define CUT(val,mult) ((uint16_t)((val)/power(10,(uint8_t)mult)))
 
-#define ROUND(val,mult,prec) ((uint16_t)(val+5*power(10,(uint8_t)mult-prec-1)))
+/* 
+ * The most calculations in this program made on integer values. 
+ * Floating point precision is achieved by doing calculations on 
+ * values multiplied with 10^x, where i x is precision. For example 
+ * if we want to write 2.345 with precision of 3 digits after 
+ * floating point, we will use 2345, as it is equal to 2.345*10^3
+ * Recalculation is done just before displayng the values.
+ * The next three macros are provided to made such calculations.
+ *
+ * Parameters:
+ *    <val>   - value on which calculations are made
+ *    <mult>  - multiplier 
+ *    <prec>  - precision of the calculations; shoud be less
+ *              or equal then multiplier
+ *
+ * ROUND macro just do the rounding to <prec> digits after
+ * imaginable point. Be aware that it does not truncate the rest 
+ * digits
+ *
+ * uint32_t gives us 4294967 km 296 m of maximium pass
+ */
+#define ROUND(val,mult,prec) ((uint32_t)(val+5*power(10,(uint8_t)mult-prec-1)))
 
+/*
+ * This macro just truncates digits after the floating point, so it
+ * only left integer part before.
+ */
 #define ROUND1(val,mult,prec) ((uint16_t)CUT(ROUND(val,mult,prec),mult))
 
+/*
+ * And the following macro truncate digits before floating point,
+ * so it only left floating part with the specified precision.
+ */
 #define ROUND2(val,mult,prec) (uint16_t)(CUT(ROUND(val,mult,prec)-CUT(ROUND(val,mult,prec),mult)*power(10,(uint8_t)mult),mult-prec))
 
 
@@ -274,22 +303,29 @@ SIGNAL(SIG_INTERRUPT0)
 		avg_speed_m  = calc_speed_m(passed_speed_ticks,passed_seconds);
 		avg_speed_km = avg_speed_m * 36 / 10;
 
-	
+
+		// printing speed in km/h and m/s
 		lcd_locate(1,1);
 		fprintf(stderr, "%3u km/h  %3u m/s",m_speed_km,m_speed_m);
 
+		// printing fuel consumption
 		lcd_locate(2,1);
 		fprintf(stderr, " %3u.%u l/100km %2u.%u l/h",ROUND1(m_fuel_100,3,1),ROUND2(m_fuel_100,3,1),ROUND1(m_fuel_h,3,1),ROUND2(m_fuel_h,3,1));
 
+		// temporarily: checking for error
 		if(ROUND2(m_fuel_100,3,1)>9) { lcd_locate(1,1); fprintf(stderr,"%u",m_fuel_100); while(1);}
 		
+		// avarage speed and fuel consumption
 		lcd_locate(3,1);
 		fprintf(stderr, "%3u km/h %3u.%u l/100",avg_speed_km,ROUND1(avg_fuel_100,3,1),ROUND2(avg_fuel_100,3,1));
 		
+		// printing journey time
 		lcd_locate(4,1);
-		//fprintf(stderr, "Passed %3u",speed_ticks);
-		//fprintf(stderr, "Passed %lu km.",passed_speed_ticks);
-		fprintf(stderr, "Passed %u.%3u km.",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
+		fprintf(stderr,"%02u:%02u:%02u", (uint8_t)(passed_seconds/3600),(uint8_t)((passed_seconds%3600)/60),(uint8_t)(passed_seconds%60));
+
+		// printing passed dist
+		lcd_locate(4,10);
+		fprintf(stderr, "%4u.%03u km",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
 			
 	
 		passed_seconds++;

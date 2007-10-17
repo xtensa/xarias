@@ -1,0 +1,10 @@
+XARIAS carputer project changelog.
+---------------------------------------------------------------------------
+
+Somewhere in time - first version
+
+17.10.2007 
+- roundation bug fixed that caused limitation of maximum path 
+to 65 km. and 535 m. :)
+- added journey timer
+
