@@ -5,16 +5,16 @@ HRADWARE:
 All hardware designs are licensed under TAPR Open Hardware License. 
 For full text of the license please see file "schematics/COPYING".
 
-
-
 FIRMWARE:
 
 The source code of the firmware for ATMega MCU, which is the heart 
-of the project is licensed under General Public License version 3.
+of the project, is licensed under General Public License version 3.
 
-The sourcecode for XARIAS project uses avr-libc library, which is 
+The source code for XARIAS project uses avr-libc library, which is 
 distributed under so-called "Modified BSD License". It also uses 
 some example files from avr-libc library, which are distributed 
 under "THE BEER-WARE LICENSE". Both "Modified BSD License" and 
 "THE BEER-WARE LICENSE" are GPL compatible. Full text of the 
-GPL v3 license is attached in "code/COPYING" file.
+GPL v3 license is attached in "firmware/COPYING" file.
+
+
