@@ -1,0 +1,43 @@
+Copyright (C) 2007 Roman Pszonczenko
+romka [~at~] kolos [~dot~] math [~dot~] uni [~dot~] lodz [~dot~] pl
+ 
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+USA.
+
+
+
+
+
+HARDWARE:
+
+Hardware is designed with gEDA suite. All sources are available in 
+"<xarias_root>/schematics/" directory.  You can find particular boards 
+schematics in "<xarias_root>/schematics/vX.Y/" directories. For details 
+of specific board please see "<xarias_root>/schematics/vX.Y/README" file.
+
+WARNING: please take a note, that you should edit 
+"<xarias_root>/schematics/vX.Y/gafrc" to point correctly to your
+"<xarias_root>/schematics/symbols" directory.
+
+
+FIRMWARE:
+
+To be able to compile the firmware you have to have installed 
+avr-gcc cross-compiler and avr-libc libraries. For more information
+please refer to http://www.nongnu.org/avr-libc/
+and http://www.avrfreaks.net/wiki/index.php/Documentation:AVR_GCC
+
+
+For more information please refer to: http://xarias.googlecode.com/
