@@ -24,11 +24,11 @@ HARDWARE:
 
 Hardware is designed with gEDA suite. All sources are available in 
 "<xarias_root>/schematics/" directory.  You can find particular boards 
-schematics in "<xarias_root>/schematics/vX.Y/" directories. For details 
-of specific board please see "<xarias_root>/schematics/vX.Y/README" file.
+schematics in "<xarias_root>/schematics/bX.Y/" directories. For details 
+of specific board please see "<xarias_root>/schematics/bX.Y/README" file.
 
 WARNING: please take a note, that you should edit 
-"<xarias_root>/schematics/vX.Y/gafrc" to point correctly to your
+"<xarias_root>/schematics/bX.Y/gafrc" to point correctly to your
 "<xarias_root>/schematics/symbols" directory.
 
 
