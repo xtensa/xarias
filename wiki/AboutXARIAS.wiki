@@ -1,0 +1,17 @@
+#summary General description of the XARIAS project
+
+= Introduction =
+
+XARIAS is embeded system that runs under Atmel's ATmega control. It is designed to gain different information from your car and display it in human-readable form. In the feature it will also be capable of controlling different car subsystems (like aircon or power window). At the moment XARIAS v0.1 is capable of doing the following:
+ * calculate momentary and avarage speed
+ * calculate momentary and avarage fuel consumption
+ * calculate journey time and distance
+It's not much but it's just a begining. What is planned to implement:
+ * temeprature sensors (inside/outside)
+ * aircon control and programming
+ * automatic window closing
+
+
+= Hardware =
+
+The heart of the system is 
