@@ -14,4 +14,4 @@ It's not much but it's just a begining. What is planned to implement:
 
 = Hardware =
 
-The heart of the system is 
+The heart of the system is ATMega MCU. It is also used DS1307 RTC from Dallas Semiconductor. DS1307 is perfect, because it has programmable squarewave output signal, 56 bytes of nonvolatile memory and automatic powerfail detect and switch circuity. Output signal is used to trigger measurement routines and nonvolatile memory will be used to save preferances and statistics.
