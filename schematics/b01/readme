@@ -4,7 +4,7 @@ Copyright 2007 TAPR (c) http://www.tapr.org/OHL
 Please use gEDA suite to view/edit attached schematics
 
 WARNING: please take a note, that you should edit 
-"<xarias_root>/schematics/bX.Y/gafrc" to point correctly to your
+"<xarias_root>/schematics/bXX/gafrc" to point correctly to your
 "<xarias_root>/schematics/symbols" directory.
 
 

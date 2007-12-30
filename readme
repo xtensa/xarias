@@ -18,17 +18,31 @@ USA.
 
 
 
+Version v0.1 is capable of the following:
+ - momentary and average speed measurement
+ - time of the journey
+ - momentary and average fuel consumption
+ - passed distance
+
+
 
 
 HARDWARE:
 
 Hardware is designed with gEDA suite. All sources are available in 
-"<xarias_root>/schematics/" directory.  You can find particular boards 
-schematics in "<xarias_root>/schematics/bX.Y/" directories. For details 
-of specific board please see "<xarias_root>/schematics/bX.Y/README" file.
+"<xarias_root>/schematics/" directory.  You can find particular 
+boards schematics in "<xarias_root>/schematics/bXX/" directories 
+('b' comes from "board"). For details of specific board please see 
+"<xarias_root>/schematics/bXX/readme" file.
+
+XARIAS project is not the single board. As the project develops new
+boards are designed. They are different from each other and probably 
+they will be designed for different applications. As a result each
+single board is stored in different bXX directory, where XX is the 
+number of the board.
 
 WARNING: please take a note, that you should edit 
-"<xarias_root>/schematics/bX.Y/gafrc" to point correctly to your
+"<xarias_root>/schematics/bXX/gafrc" to point correctly to your
 "<xarias_root>/schematics/symbols" directory.
 
 
