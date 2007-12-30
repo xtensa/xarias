@@ -1,16 +1,19 @@
 Licensed under the TAPR Open Hardware License
 Copyright 2007 TAPR (c) http://www.tapr.org/OHL
 
+Please use gEDA suite to view/edit attached schematics
+
+WARNING: please take a note, that you should edit 
+"<xarias_root>/schematics/bX.Y/gafrc" to point correctly to your
+"<xarias_root>/schematics/symbols" directory.
+
+
+
+
+GENERAL DESCRIPTION
+
 This hardware (widely known as carputer) is developed to allow 
 you to get lots of useful information about your car. 
-
-
-Version v0.1 is capable of the following:
- - momentary and average speed measurement
- - time of the journey
- - momentary and average fuel consumption
- - passed distance
-
 
 XARIAS could easily be adapted to use in every gasoline powered
 car with electronically controlled injection time. This 
