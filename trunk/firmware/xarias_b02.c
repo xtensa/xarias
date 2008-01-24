@@ -1,7 +1,7 @@
 /*
  * XARIAS carputer project
  *
- * Copyright (c) 2007 by Roman Pszonczenko xtensa <_at_> gmail
+ * Copyright (c) 2007 by Roman Pszonczenko xtensa <_at_> go0ogle mail
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -32,6 +32,11 @@
 #include <util/delay.h>
 //#include <util/twi.h>
 #include <avr/interrupt.h>
+
+/*
+ * Using "swap without tmp" algorythm
+ */
+#define SWAP(a,b) { a^=b; b^=a; a^=b; }
 
 
 void gLCD_cls();
@@ -101,12 +106,12 @@ void gLCD_cls()
 #endif
 }
 
-void gLCD_clear_region(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
+void gLCD_fill_rect(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2,uint8_t pattern)
 {
-	uint8_t  cs, y, pixs[64], pattern;
+	uint8_t  cs, y, pixs[64], pat;
 	uint16_t x; 
 
-	pattern=0xFF;
+	pat=0xFF;
 	cs=x1/64;
 	y=y1/8;
 	x=x1%64; // x is the position on active driver
@@ -136,50 +141,112 @@ void gLCD_clear_region(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
 				if(cs==3) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
 #endif
 				/*
-				 * reading byte line on current driver to buffer
-				 */
-				s6b0108_outcmd(S6B0108_SETY_MASK|x);
-				while(cs*64+x<x2 && x<64) pixs[x]=s6b0108_indata();
-				s6b0108_outcmd(S6B0108_SETY_MASK|x);
-				/*
 				 * Start of the line
 				 */
+				pat=0xFF;
 				if( cs*64+x == x1 )
 				{
-						pattern=0xFF;
-						if( y1/8 == y ) pattern <<= ((y+1)*8-y1);
-						else if( y2/8 == y ) pattern >>= ((y+1)*8-y2);
+					if (y1/8 == y2/8) pat = ((0xFF >> (y1-y*8)) & (0xFF << (y2-y*8)));
+					else if( y1/8 == y ) pat = 0xFF >> (y1-y*8);
+					else if( y2/8 == y ) pat = 0xFF << (y2-y*8);
+					/*
+					 * reading byte line on current driver to buffer
+					 */
+					s6b0108_outcmd(S6B0108_SETY_MASK|x);
+					while(cs*64+x<x2 && x<64) pixs[x]=s6b0108_indata();
 				}
+				s6b0108_outcmd(S6B0108_SETY_MASK|x);
 			}
-			if( pattern == 0xFF ) s6b0108_outdata(0x00);
-			else s6b0108_outdata(pixs[x]&pattern); 
+			if( pat == 0xFF ) s6b0108_outdata(pattern);
+			else s6b0108_outdata( (pixs[x]&~pat) | (pattern&pat) ); 
 			x++;
 			x%=64;	
 		}
+		y++;
 	}
+}
+
+/*
+ * Function turns ON or OFF given pixel
+ */
+void gLCD_pixel(uint16_t x, uint8_t y, bool onoff)
+{
+	uint8_t tmp;
+	if(cs==1) S6B0108_UP(CS1); else S6B0108_DOWN(CS1);
+#if GLCD_RES_X/64>1
+	if(cs==2) S6B0108_UP(CS2); else S6B0108_DOWN(CS2);
+#endif
+#if GLCD_RES_X/64>2
+	if(cs==3) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
+#endif
+	s6b0108_outcmd(S6B0108_SETX_MASK|(y/8));
+	s6b0108_outcmd(S6B0108_SETY_MASK|(x%64));
+	tmp=s6b0108_indata(); 
+	s6b0108_outcmd(S6B0108_SETY_MASK|(x%64));
+	if(onoff) s6b0108_outdata(tmp|_BV(y%8));
+	else s6b0108_outdata(tmp&~_BV(y%8));
+}
+
+#define gLCD_pixelon(x,y) 	gLCD_pixel(x,y,true)
+#define gLCD_pixeloff(x,y) 	gLCD_pixel(x,y,false)
+
+/*
+ * gLCD_line draw the line between points (x1,y1) and (x2,y2)
+ */
+void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
+{
+	uint16_t x;
+	/*
+	 * a and b parameters will be calculated as multiplication of 100
+	 */
+	int16_t a, b;
+	if(x1>x2 || y1>y2 || x1>GLCD_RES_X || y1>GLCD_RES_Y)
+		return;
+	a=(((int16_t)y2-(int16_t)y1)*100)/((int16_t)x2-(int16_t)x1);
+	b=100*(int16_t)*y1-a*(int16_t)*x1;
+
+	for(x=x1;x<=x2;x++) gLCD_pixelon(x,(a*x+b)/100)
+}
+
+/*
+ * The following function draws rectangle frame. As point (x1,y1) 
+ * and (x2,y2) you shoud give opposie vertices of the rectangle.
+ */
+void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width)
+{
+	uint8_t i;
+	/*
+	 * First we shoud swap the coordinats so that we have
+	 * top left corner and right bottom corner vertices.
+	 */
+	if(x1>x2) SWAP(x1,x2);
+	if(y1>y2) SWAP(y1,y2);
+
+	for(i=0;i<w;i++)
+	{
+		gLCD_line(x1+w+1,y1+w,x2-w,y1+w);
+		gLCD_line(x2-w,y1+w+1,x2-w,y2-w);
+		gLCD_line(x2-w-1,y2-w,x1+w,y2-w);
+		gLCD_line(x1+w,y2-w-1,x1+w,y1+w);
+	}	
 }
 
 
 int main()
 {
+	uint8_t i;
 	gLCD_init();
 
-	//S6B0108_DOWN(CS1);
-	S6B0108_UP(CS2);
+	gLCD_frame(46,45, 99,57, 3);
 
-	s6b0108_outcmd(S6B0108_START_MASK|2);
-	s6b0108_outcmd(S6B0108_SETX_MASK|3);
-	s6b0108_outcmd(S6B0108_SETY_MASK);
-//	return 0;
-
-
-	while(1)
+	for(i=0,j=1;;i+=j)	
 	{
-		s6b0108_outdata(0xAA);
-		_delay_ms(100);
-		s6b0108_outdata(0x55);
-		_delay_ms(100);
-	}
+		if(i==63) j=-1;
+		if(i==0) j=1;
 
+		gLCD_line(0,0, 128,i);
+		_delay_ms(50);
+	}
+	
 	return 0;
 }
