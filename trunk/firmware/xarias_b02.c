@@ -73,7 +73,8 @@ void gLCD_init()
 
 void gLCD_cls()
 {
-	uint8_t i,j, drives=GLCD_RES_X/64;
+	uint8_t i,j, drives;
+	drives=GLCD_RES_X/64;
 	S6B0108_UP(CS1);
 #if GLCD_RES_X/64>1
 	S6B0108_UP(CS2);
@@ -102,8 +103,14 @@ void gLCD_cls()
 
 void gLCD_clear_region(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
 {
-	uint8_t  cs=x1/64, y=y1/8, pixs[64];
-	uint16_t x=x1%64; // x is position on active driver
+	uint8_t  cs, y, pixs[64], pattern;
+	uint16_t x; 
+
+	pattern=0xFF;
+	cs=x1/64;
+	y=y1/8;
+	x=x1%64; // x is the position on active driver
+	
 	if(x1>x2 || y1>y2 || x1>GLCD_RES_X || y1>GLCD_RES_Y)
 		return;
 	
