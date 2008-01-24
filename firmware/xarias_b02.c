@@ -100,10 +100,56 @@ void gLCD_cls()
 #endif
 }
 
-void gLCD_clear(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
+void gLCD_clear_region(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
 {
+	uint8_t  cs=x1/64, y=y1/8, pixs[64];
+	uint16_t x=x1%64; // x is position on active driver
 	if(x1>x2 || y1>y2 || x1>GLCD_RES_X || y1>GLCD_RES_Y)
 		return;
+	
+	while(y<=y2/8)
+	{
+		s6b0108_outcmd(S6B0108_SETX_MASK|(y/8));
+	 	/*
+		 * Clearing line by line, 8 bits at once
+		 */
+		while((cs*64+x)<=x2)
+		{
+			cs=x/64;
+			/*
+			 * if driver canged ...
+			 */
+			if(!x || cs*64+x==x1) 
+			{
+				if(cs==1) S6B0108_UP(CS1); else S6B0108_DOWN(CS1);
+#if GLCD_RES_X/64>1
+				if(cs==2) S6B0108_UP(CS2); else S6B0108_DOWN(CS2);
+#endif
+#if GLCD_RES_X/64>2
+				if(cs==3) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
+#endif
+				/*
+				 * reading byte line on current driver to buffer
+				 */
+				s6b0108_outcmd(S6B0108_SETY_MASK|x);
+				while(cs*64+x<x2 && x<64) pixs[x]=s6b0108_indata();
+				s6b0108_outcmd(S6B0108_SETY_MASK|x);
+				/*
+				 * Start of the line
+				 */
+				if( cs*64+x == x1 )
+				{
+						pattern=0xFF;
+						if( y1/8 == y ) pattern <<= ((y+1)*8-y1);
+						else if( y2/8 == y ) pattern >>= ((y+1)*8-y2);
+				}
+			}
+			if( pattern == 0xFF ) s6b0108_outdata(0x00);
+			else s6b0108_outdata(pixs[x]&pattern); 
+			x++;
+			x%=64;	
+		}
+	}
 }
 
 
