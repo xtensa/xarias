@@ -168,16 +168,18 @@ uint8_t s6b0108_inbyte(uint8_t rs)
 	uint8_t x;
 
 	if(rs) s6b0108_wait_ready();
-	s6b0108_ddr_databits(INPUT);
 	s6b0108_write_databits(0x00); // disabling pull-ups
+	s6b0108_ddr_databits(INPUT);
 	S6B0108_PORT(RW) |= _BV(S6B0108_RW);
 	if (rs)
 		S6B0108_PORT(RS) |= _BV(S6B0108_RS);
 	else
 		S6B0108_PORT(RS) &= ~_BV(S6B0108_RS);
+	s6b0108_pulse_e(false); //first access is to copy display data to display output register
 	_delay_us(0.14);
-	S6B0108_PORT(E) |= _BV(S6B0108_E);
-	_delay_us(0.25);
+	S6B0108_PORT(E) |= _BV(S6B0108_E); 
+	_delay_us(0.32);
+	
  	x = s6b0108_read_databits();
 	S6B0108_PORT(E)  &= ~_BV(S6B0108_E);
 	S6B0108_PORT(RW) &= ~_BV(S6B0108_RW);

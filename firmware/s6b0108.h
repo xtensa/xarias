@@ -28,8 +28,8 @@
 
 #define s6b0108_outcmd(a)  s6b0108_outbyte(a,0)
 #define s6b0108_outdata(a) s6b0108_outbyte(a,1)
-#define s6b0108_incmd(a)   s6b0108_inbyte(0)
-#define s6b0108_indata(a)  s6b0108_inbyte(1)
+#define s6b0108_incmd()   s6b0108_inbyte(0)
+#define s6b0108_indata()  s6b0108_inbyte(1)
 
 
 void    s6b0108_outbyte(uint8_t n, uint8_t rs);

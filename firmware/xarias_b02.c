@@ -29,6 +29,7 @@
 #include <avr/io.h>
 //#include <avr/pgmspace.h>
 
+#include <stdbool.h>
 #include <util/delay.h>
 //#include <util/twi.h>
 #include <avr/interrupt.h>
@@ -38,6 +39,9 @@
  */
 #define SWAP(a,b) { a^=b; b^=a; a^=b; }
 
+#define MIN(a,b) 	((a)<(b)?(a):(b))
+#define MAX(a,b) 	((a)>(b)?(a):(b))
+#define ABS(a)		((a)<0?(-(a)):(a))
 
 void gLCD_cls();
 
@@ -133,12 +137,12 @@ void gLCD_fill_rect(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2,uint8_t pat
 			 */
 			if(!x || cs*64+x==x1) 
 			{
-				if(cs==1) S6B0108_UP(CS1); else S6B0108_DOWN(CS1);
+				if(cs==0) S6B0108_UP(CS1); else S6B0108_DOWN(CS1);
 #if GLCD_RES_X/64>1
-				if(cs==2) S6B0108_UP(CS2); else S6B0108_DOWN(CS2);
+				if(cs==1) S6B0108_UP(CS2); else S6B0108_DOWN(CS2);
 #endif
 #if GLCD_RES_X/64>2
-				if(cs==3) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
+				if(cs==2) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
 #endif
 				/*
 				 * Start of the line
@@ -172,12 +176,13 @@ void gLCD_fill_rect(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2,uint8_t pat
 void gLCD_pixel(uint16_t x, uint8_t y, bool onoff)
 {
 	uint8_t tmp;
-	if(cs==1) S6B0108_UP(CS1); else S6B0108_DOWN(CS1);
+	if(x>=GLCD_RES_X || y>=GLCD_RES_Y) return;
+	if(x/64==0) S6B0108_UP(CS1); else S6B0108_DOWN(CS1);
 #if GLCD_RES_X/64>1
-	if(cs==2) S6B0108_UP(CS2); else S6B0108_DOWN(CS2);
+	if(x/64==1) S6B0108_UP(CS2); else S6B0108_DOWN(CS2);
 #endif
 #if GLCD_RES_X/64>2
-	if(cs==3) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
+	if(x/64==2) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
 #endif
 	s6b0108_outcmd(S6B0108_SETX_MASK|(y/8));
 	s6b0108_outcmd(S6B0108_SETY_MASK|(x%64));
@@ -195,17 +200,30 @@ void gLCD_pixel(uint16_t x, uint8_t y, bool onoff)
  */
 void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
 {
-	uint16_t x;
 	/*
 	 * a and b parameters will be calculated as multiplication of 100
 	 */
-	int16_t a, b;
-	if(x1>x2 || y1>y2 || x1>GLCD_RES_X || y1>GLCD_RES_Y)
-		return;
-	a=(((int16_t)y2-(int16_t)y1)*100)/((int16_t)x2-(int16_t)x1);
-	b=100*(int16_t)*y1-a*(int16_t)*x1;
+	int16_t x,a,b;
+	
+	if(x1>=GLCD_RES_X || y1>=GLCD_RES_Y) return;
+	if(x2>=GLCD_RES_X || y2>=GLCD_RES_Y) return;
+	
+	/*
+	 * 50 added for good roundings
+	 */
+	if(ABS((int16_t)x2-(int16_t)x1)>ABS((int8_t)y2-(int8_t)y1))
+	{
+		a=(((int16_t)y2-(int16_t)y1)*100)/((int16_t)x2-(int16_t)x1);
+		b=(int16_t)y1*100-a*(int16_t)x1;
+		for(x=MIN(x1,x2);x<=MAX(x1,x2);x++) gLCD_pixelon(x,(a*x+b)/100);
+	}
+	else
+	{
+		a=(((int16_t)x2-(int16_t)x1)*100)/((int16_t)y2-(int16_t)y1);
+		b=(int16_t)x1*100-a*(int16_t)y1;
+		for(x=MIN(y1,y2);x<=MAX(y1,y2);x++) gLCD_pixelon((a*x+b)/100,x);
+	}
 
-	for(x=x1;x<=x2;x++) gLCD_pixelon(x,(a*x+b)/100)
 }
 
 /*
@@ -222,31 +240,56 @@ void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width)
 	if(x1>x2) SWAP(x1,x2);
 	if(y1>y2) SWAP(y1,y2);
 
-	for(i=0;i<w;i++)
+	for(i=0;i<width;i++)
 	{
-		gLCD_line(x1+w+1,y1+w,x2-w,y1+w);
-		gLCD_line(x2-w,y1+w+1,x2-w,y2-w);
-		gLCD_line(x2-w-1,y2-w,x1+w,y2-w);
-		gLCD_line(x1+w,y2-w-1,x1+w,y1+w);
+		gLCD_line(x1+i+1,y1+i,x2-i,y1+i);
+		gLCD_line(x2-i,y1+i+1,x2-i,y2-i);
+		gLCD_line(x2-i-1,y2-i,x1+i,y2-i);
+		gLCD_line(x1+i,y2-i-1,x1+i,y1+i);
 	}	
 }
 
 
+void gLCD_rwtest()
+{
+	uint8_t i,j;
+	
+	s6b0108_outcmd(S6B0108_SETX_MASK);
+	s6b0108_outcmd(S6B0108_SETY_MASK|3);
+	s6b0108_outdata(0xFF); 
+	s6b0108_outcmd(S6B0108_SETY_MASK|3);
+//	j=s6b0108_incmd(); 
+	j=s6b0108_indata(); 
+	s6b0108_outdata('e'); 
+	S6B0108_DOWN(CS2);
+	S6B0108_UP(CS1);
+	s6b0108_outcmd(S6B0108_SETX_MASK);
+	s6b0108_outcmd(S6B0108_SETY_MASK);
+	for(i=0;i<8;i++)
+		if(j&_BV(i))
+			s6b0108_outdata(0xFF);
+		else
+			s6b0108_outdata(0x01); 
+}
+
+
+
 int main()
 {
-	uint8_t i;
+	//uint8_t i,j;
+
 	gLCD_init();
+	S6B0108_UP(CS2);
 
-	gLCD_frame(46,45, 99,57, 3);
+	gLCD_line(0,0,127,1);
+	gLCD_line(0,30,127,32);
+	gLCD_line(0,2,1,62);
+	gLCD_line(70,0,71,10);
 
-	for(i=0,j=1;;i+=j)	
-	{
-		if(i==63) j=-1;
-		if(i==0) j=1;
-
-		gLCD_line(0,0, 128,i);
-		_delay_ms(50);
-	}
+	gLCD_line(0,40,127,39);
+	gLCD_line(127,2,126,62);
+	gLCD_line(80,0,79,10);
+//	gLCD_frame(46,41, 99,57, 3);
 	
 	return 0;
 }
