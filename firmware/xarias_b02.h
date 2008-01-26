@@ -18,34 +18,21 @@
 #define GLCD_RES_X	128
 #define GLCD_RES_Y	64
 
-#define S6B0108_P_RS  	A
-#define S6B0108_RS    	0
-#define S6B0108_P_RW  	A
-#define S6B0108_RW    	1
-#define S6B0108_P_E   	A
-#define S6B0108_E     	2
-#define S6B0108_P_DB0 	A
-#define S6B0108_DB0   	3
-#define S6B0108_P_DB1 	A
-#define S6B0108_DB1   	4
-#define S6B0108_P_DB2 	A
-#define S6B0108_DB2   	5
-#define S6B0108_P_DB3 	A
-#define S6B0108_DB3   	6
-#define S6B0108_P_DB4 	A
-#define S6B0108_DB4   	7
-#define S6B0108_P_DB5 	C
-#define S6B0108_DB5   	7
-#define S6B0108_P_DB6 	C
-#define S6B0108_DB6   	6
-#define S6B0108_P_DB7 	C
-#define S6B0108_DB7   	5
-#define S6B0108_P_CS1 	C
-#define S6B0108_CS1   	4
-#define S6B0108_P_CS2 	C
-#define S6B0108_CS2   	3
-#define S6B0108_P_RST 	C
-#define S6B0108_RST   	2
+/*
+ * It is assumed that pins of LCD are connected
+ * to corresponding pins of MCU, e.g. 0 to 0,
+ * 1 to 1, 2 to 2 etc.
+ */
+#define S6B0108_PDATA 	A
+
+#define S6B0108_PCMD	C
+
+#define RS    	7
+#define RW    	6
+#define E     	5
+#define CS1   	4
+#define CS2   	3
+#define RST   	2
 
 #define B02_P_LCD_POWER D
 #define B02_LCD_POWER   1
