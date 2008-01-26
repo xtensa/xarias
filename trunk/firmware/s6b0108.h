@@ -6,13 +6,10 @@
 #include <avr/io.h>
 
 #define MERGE(a,b) a##b
-#define DUMMY(a,b) MERGE(a,b)
-#define S6B0108_PORT(a) DUMMY(PORT,S6B0108_P_##a)
-#define S6B0108_PIN(a) DUMMY(PIN,S6B0108_P_##a)
-#define S6B0108_DDR(a) DUMMY(DDR,S6B0108_P_##a)
 
-#define S6B0108_UP(a) S6B0108_PORT(a)|=_BV(S6B0108_##a)
-#define S6B0108_DOWN(a) S6B0108_PORT(a)&=~_BV(S6B0108_##a)
+#define PORT(a) 	MERGE(PORT,a)
+#define PIN(a) 		MERGE(PIN,a)
+#define DDR(a) 		MERGE(DDR,a)
 
 #define S6B0108_DISPLAY_ON	0x3F
 #define S6B0108_DISPLAY_OFF	0x3E
@@ -23,8 +20,8 @@
 #define S6B0108_ON_FLAG 	0x20
 #define S6B0108_RESET_FLAG	0x10
 
-#define OUTPUT	true
-#define INPUT	false
+#define OUTPUT	0xFF
+#define INPUT	0x00
 
 #define s6b0108_outcmd(a)  s6b0108_outbyte(a,0)
 #define s6b0108_outdata(a) s6b0108_outbyte(a,1)

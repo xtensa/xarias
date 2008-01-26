@@ -34,6 +34,7 @@
 //#include <util/twi.h>
 #include <avr/interrupt.h>
 
+
 /*
  * Using "swap without tmp" algorythm
  */
@@ -52,29 +53,19 @@ void gLCD_init()
 
 	// setting data direction for output ports
 	B02_DDR(LCD_POWER)  |= _BV(B02_LCD_POWER);
-	S6B0108_DDR(CS1)    |= _BV(S6B0108_CS1);
-	S6B0108_DDR(CS2)    |= _BV(S6B0108_CS2);
-	S6B0108_DDR(RST)    |= _BV(S6B0108_RST);
-	S6B0108_DDR(RW)     |= _BV(S6B0108_RW);
-	S6B0108_DDR(RS)     |= _BV(S6B0108_RS);
-	S6B0108_DDR(E)      |= _BV(S6B0108_E);
 
-	S6B0108_DOWN(RW);
-	S6B0108_DOWN(RS);
-	S6B0108_DOWN(RST);
-	S6B0108_DOWN(E);
+	DDR(S6B0108_PCMD)  |=  ( _BV(CS1) | _BV(CS2) | _BV(RST) | _BV(E) | _BV(RW) | _BV(RS));
+
+	PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) |_BV(RW) | _BV(RS) | _BV(RST) | _BV(E));
 	
 	// turn off display power
 	B02_DOWN(LCD_POWER);
-	// now switching RST down
-	S6B0108_DOWN(RST);
-
-	// swithing display power back
+	// swithing display power back after delay
 	_delay_us(5);
 	B02_UP(LCD_POWER);
 	// wait 2us and bring power up ( 1us according to datasheet)
 	_delay_us(2);
-	S6B0108_UP(RST);
+	PORT(S6B0108_PCMD) |= _BV(RST);
 
 	gLCD_cls();
 }
@@ -82,14 +73,15 @@ void gLCD_init()
 
 void gLCD_cls()
 {
-	uint8_t i,j, drives;
-	drives=GLCD_RES_X/64;
-	S6B0108_UP(CS1);
-#if GLCD_RES_X/64>1
-	S6B0108_UP(CS2);
+	uint8_t i,j;
+#if GLCD_RES_X/64==1
+	PORT(S6B0108_PCMD) |= _BV(CS1);
 #endif
-#if GLCD_RES_X/64>2
-	S6B0108_UP(CS3);
+#if GLCD_RES_X/64==2
+	PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) );
+#endif
+#if GLCD_RES_X/64==3
+	PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) | _BV(CS3) );
 #endif
 	s6b0108_outcmd(S6B0108_DISPLAY_OFF);
 	s6b0108_outcmd(S6B0108_START_MASK);
@@ -101,54 +93,57 @@ void gLCD_cls()
 			s6b0108_outdata(0x00);
 	}
 	s6b0108_outcmd(S6B0108_DISPLAY_ON);
-	S6B0108_DOWN(CS1);
-#if GLCD_RES_X/64>1
-	S6B0108_DOWN(CS2);
+#if GLCD_RES_X/64==1
+	PORT(S6B0108_PCMD) &= ~_BV(CS1);
 #endif
-#if GLCD_RES_X/64>2
-	S6B0108_DOWN(CS3);
+#if GLCD_RES_X/64==2
+	PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) );
+#endif
+#if GLCD_RES_X/64==3
+	PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) | _BV(CS3) );
 #endif
 }
 
 void gLCD_fill_rect(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2,uint8_t pattern)
 {
 	uint8_t  cs, y, pixs[64], pat;
-	uint16_t x; 
+	uint16_t x, xt; 
 
 	pat=0xFF;
 	cs=x1/64;
 	y=y1/8;
-	x=x1%64; // x is the position on active driver
 	
 	if(x1>x2 || y1>y2 || x1>GLCD_RES_X || y1>GLCD_RES_Y)
 		return;
 	
 	while(y<=y2/8)
 	{
-		s6b0108_outcmd(S6B0108_SETX_MASK|(y/8));
+		x=x1;
+		pat=0xFF;
+
 	 	/*
-		 * Clearing line by line, 8 bits at once
+		 * Filling line by line, 8 bits at once
 		 */
-		while((cs*64+x)<=x2)
+		while(x<=x2)
 		{
-			cs=x/64;
 			/*
 			 * if driver canged ...
 			 */
-			if(!x || cs*64+x==x1) 
+			if(!(x%64) || x==x1) 
 			{
-				if(cs==0) S6B0108_UP(CS1); else S6B0108_DOWN(CS1);
+				cs=x/64;
+				if(cs==0) PORT(S6B0108_PCMD) |= _BV(CS1); else PORT(S6B0108_PCMD) &= ~_BV(CS1); 
 #if GLCD_RES_X/64>1
-				if(cs==1) S6B0108_UP(CS2); else S6B0108_DOWN(CS2);
+				if(cs==1) PORT(S6B0108_PCMD) |= _BV(CS2); else PORT(S6B0108_PCMD) &= ~_BV(CS2); 
 #endif
 #if GLCD_RES_X/64>2
-				if(cs==2) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
+				if(cs==2) PORT(S6B0108_PCMD) |= _BV(CS3); else PORT(S6B0108_PCMD) &= ~_BV(CS3); 
 #endif
+				s6b0108_outcmd(S6B0108_SETX_MASK|y);
 				/*
 				 * Start of the line
 				 */
-				pat=0xFF;
-				if( cs*64+x == x1 )
+				if( x == x1)
 				{
 					if (y1/8 == y2/8) pat = ((0xFF >> (y1-y*8)) & (0xFF << (y2-y*8)));
 					else if( y1/8 == y ) pat = 0xFF >> (y1-y*8);
@@ -156,15 +151,21 @@ void gLCD_fill_rect(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2,uint8_t pat
 					/*
 					 * reading byte line on current driver to buffer
 					 */
-					s6b0108_outcmd(S6B0108_SETY_MASK|x);
-					while(cs*64+x<x2 && x<64) pixs[x]=s6b0108_indata();
+				}
+				if(pat!=0xFF)
+				{
+					for(xt=x%64; cs*64+xt<x2 && xt<64; xt++)
+					{
+						s6b0108_outcmd(S6B0108_SETY_MASK|xt);
+						pixs[xt]=s6b0108_indata();
+					}
 				}
 				s6b0108_outcmd(S6B0108_SETY_MASK|x);
 			}
+//			s6b0108_outdata(0xAA);
 			if( pat == 0xFF ) s6b0108_outdata(pattern);
-			else s6b0108_outdata( (pixs[x]&~pat) | (pattern&pat) ); 
+			else s6b0108_outdata( (pixs[x%64]&pat) | (pattern&~pat) ); 
 			x++;
-			x%=64;	
 		}
 		y++;
 	}
@@ -177,13 +178,14 @@ void gLCD_pixel(uint16_t x, uint8_t y, bool onoff)
 {
 	uint8_t tmp;
 	if(x>=GLCD_RES_X || y>=GLCD_RES_Y) return;
-	if(x/64==0) S6B0108_UP(CS1); else S6B0108_DOWN(CS1);
+	if(x/64==0) PORT(S6B0108_PCMD) |= _BV(CS1); else PORT(S6B0108_PCMD) &= ~_BV(CS1); 
 #if GLCD_RES_X/64>1
-	if(x/64==1) S6B0108_UP(CS2); else S6B0108_DOWN(CS2);
+	if(x/64==1) PORT(S6B0108_PCMD) |= _BV(CS2); else PORT(S6B0108_PCMD) &= ~_BV(CS2); 
 #endif
 #if GLCD_RES_X/64>2
-	if(x/64==2) S6B0108_UP(CS3); else S6B0108_DOWN(CS2);
+	if(x/64==2) PORT(S6B0108_PCMD) |= _BV(CS3); else PORT(S6B0108_PCMD) &= ~_BV(CS3); 
 #endif
+
 	s6b0108_outcmd(S6B0108_SETX_MASK|(y/8));
 	s6b0108_outcmd(S6B0108_SETY_MASK|(x%64));
 	tmp=s6b0108_indata(); 
@@ -200,10 +202,8 @@ void gLCD_pixel(uint16_t x, uint8_t y, bool onoff)
  */
 void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
 {
-	/*
-	 * a and b parameters will be calculated as multiplication of 100
-	 */
-	int16_t x,a,b;
+	int8_t j;
+	int16_t x,y;
 	
 	if(x1>=GLCD_RES_X || y1>=GLCD_RES_Y) return;
 	if(x2>=GLCD_RES_X || y2>=GLCD_RES_Y) return;
@@ -213,15 +213,23 @@ void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
 	 */
 	if(ABS((int16_t)x2-(int16_t)x1)>ABS((int8_t)y2-(int8_t)y1))
 	{
-		a=(((int16_t)y2-(int16_t)y1)*100)/((int16_t)x2-(int16_t)x1);
-		b=(int16_t)y1*100-a*(int16_t)x1;
-		for(x=MIN(x1,x2);x<=MAX(x1,x2);x++) gLCD_pixelon(x,(a*x+b)/100);
+		j=x2>x1?1:-1;
+		for(x=x1;x!=x2+j;x+=j)
+		{
+			y=y1+((int16_t)x-(int16_t)x1)/(((int16_t)x2-(int16_t)x1+(x2>x1?1:-1))/((int8_t)y2-(int8_t)y1+(y2>y1?1:-1)));
+			if((y2>y1 && y>y2) || (y2<y1 && y<y2)) y=y2;
+			gLCD_pixelon(x,y);
+		}
 	}
 	else
 	{
-		a=(((int16_t)x2-(int16_t)x1)*100)/((int16_t)y2-(int16_t)y1);
-		b=(int16_t)x1*100-a*(int16_t)y1;
-		for(x=MIN(y1,y2);x<=MAX(y1,y2);x++) gLCD_pixelon((a*x+b)/100,x);
+		j=y2>y1?1:-1; 
+		for(y=y1;y!=y2+j;y+=j)
+		{
+			x=x1+((int16_t)y-(int16_t)y1)/(((int16_t)y2-(int16_t)y1+(y2>y1?1:-1))/((int8_t)x2-(int8_t)x1+(x2>x1?1:-1)));
+			if((x2>x1 && x>x2) || (x2<x1 && x<x2)) x=x2;
+			gLCD_pixelon(x,y);
+		}
 	}
 
 }
@@ -252,24 +260,32 @@ void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width)
 
 void gLCD_rwtest()
 {
-	uint8_t i,j;
+	uint8_t i,j[2],k=0;
 	
+	PORT(S6B0108_PCMD) |= _BV(CS2);
 	s6b0108_outcmd(S6B0108_SETX_MASK);
 	s6b0108_outcmd(S6B0108_SETY_MASK|3);
 	s6b0108_outdata(0xFF); 
+	s6b0108_outdata('a'); 
+	s6b0108_outdata('t'); 
+	//j=s6b0108_incmd(); 
 	s6b0108_outcmd(S6B0108_SETY_MASK|3);
-//	j=s6b0108_incmd(); 
-	j=s6b0108_indata(); 
+	j[0]=s6b0108_indata(); 
+	j[1]=s6b0108_indata(); 
 	s6b0108_outdata('e'); 
-	S6B0108_DOWN(CS2);
-	S6B0108_UP(CS1);
+	PORT(S6B0108_PCMD) &= ~_BV(CS2);
+	PORT(S6B0108_PCMD) |= _BV(CS1);
 	s6b0108_outcmd(S6B0108_SETX_MASK);
 	s6b0108_outcmd(S6B0108_SETY_MASK);
-	for(i=0;i<8;i++)
-		if(j&_BV(i))
-			s6b0108_outdata(0xFF);
-		else
-			s6b0108_outdata(0x01); 
+	for(k=0;k<2;k++)
+	{
+		for(i=0;i<8;i++)
+			if(j[k]&_BV(i))
+				s6b0108_outdata(0xFF);
+			else
+				s6b0108_outdata(0x01); 
+	}
+	PORT(S6B0108_PCMD) &= ~_BV(CS1);
 }
 
 
@@ -279,17 +295,11 @@ int main()
 	//uint8_t i,j;
 
 	gLCD_init();
-	S6B0108_UP(CS2);
+//	gLCD_rwtest();
+//	return;
 
-	gLCD_line(0,0,127,1);
-	gLCD_line(0,30,127,32);
-	gLCD_line(0,2,1,62);
-	gLCD_line(70,0,71,10);
-
-	gLCD_line(0,40,127,39);
-	gLCD_line(127,2,126,62);
-	gLCD_line(80,0,79,10);
-//	gLCD_frame(46,41, 99,57, 3);
+	gLCD_fill_rect(33,4,103,34,0xAA);
+//	gLCD_frame(26,41, 99,57, 3);
 	
 	return 0;
 }
