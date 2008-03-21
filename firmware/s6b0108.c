@@ -24,8 +24,10 @@
 #include <util/delay.h>
 
 /*
-void _delay_us(int a)
+void _delay_us(double a)
 {
+	int i;
+	for (i=0;i<a*1;i++)
 	asm("nop");
 }
 */
@@ -33,38 +35,15 @@ void _delay_us(int a)
 // the following macro make a bit shift to a from position c to b
 #define _BITSHIFT(a,b,c) (((b)>(c))?(a)<<((b)-(c)):(a)>>((c)-(b)))
 
-static inline void s6b0108_wait_ready() __attribute__((always_inline));
-
 /*
- * Send one pulse to the E signal (enable).  Mind the timing
- * constraints.  If readback is set to true, read the S6B0108 data
- * pins right before the falling edge of E, and return that value.
+ * Wait until the busy flag is cleared.
  */
-static inline void s6b0108_pulse_e() __attribute__((always_inline));
-
-static inline void s6b0108_pulse_e()
+static inline void s6b0108_wait_ready() __attribute__((always_inline));
+static inline void s6b0108_wait_ready()
 {
-  PORT(S6B0108_PCMD) |= _BV(E);
-  /*
-   * Guarantee at least 500 ns of pulse width (according to datasheet
-   * 45 i enough. For high CPU frequencies, a delay loop is used.  
-   * For lower frequencies, NOPs are used, and at or below 1 MHz, 
-   * the native pulse width will already be 1 us or more so no 
-   * additional delays are needed.
-   */
-#if F_CPU > 4000000UL
-  _delay_us(0.5);
-#else
-#  if F_CPU > 1000000UL
-  __asm__ volatile("nop");
-#    if F_CPU > 2000000UL
-  __asm__ volatile("nop");
-  __asm__ volatile("nop");
-#    endif /* F_CPU > 2000000UL */
-#  endif /* F_CPU > 1000000UL */
-#endif
-  PORT(S6B0108_PCMD) &= ~_BV(E);
+	while (s6b0108_incmd() & S6B0108_BUSY_FLAG); 
 }
+
 
 /*
  * Send byte one  out to the LCD controller.
@@ -82,16 +61,25 @@ void s6b0108_outbyte(uint8_t n, uint8_t rs)
 	{
 		PORT(S6B0108_PCMD) &= ~(_BV(RW)|_BV(RS));
 	}
-	PORT(S6B0108_PDATA)=n;
 	_delay_us(0.14);
-	s6b0108_pulse_e();
+	PORT(S6B0108_PCMD) |= _BV(E);
+	PORT(S6B0108_PDATA)=n;
+	_delay_us(0.5); 
+	// 0.45 should be enough but doesn't work
+	PORT(S6B0108_PCMD) &= ~_BV(E);
+
 	PORT(S6B0108_PCMD) &= ~( _BV(RS)|_BV(RW) );
 }
 
 
 /*
  * Read one byte from the LCD controller.
+ *
+ * According to ks6b0108 documentation delays should much more
+ * smaller but in practice we should wait much much more !!! 
+ * At least I have got such an LCD :(
  */
+
 uint8_t s6b0108_inbyte(uint8_t rs)
 {
 	uint8_t x;
@@ -99,34 +87,31 @@ uint8_t s6b0108_inbyte(uint8_t rs)
 	if(rs) s6b0108_wait_ready();
 	DDR(S6B0108_PDATA)=INPUT;
 	PORT(S6B0108_PDATA)=0x00;
+	_delay_us(0.3);
 	if (rs)
 	{	// reading data
 		PORT(S6B0108_PCMD) |= (_BV(RW) | _BV(RS));
-		_delay_us(0.14);
-		s6b0108_pulse_e(); //first access is to copy display data to display output register
-		_delay_us(0.32);
+		_delay_us(0.2);
+		//first access is to copy display data to display output register
+		PORT(S6B0108_PCMD) |= _BV(E);
+		_delay_us(0.5);
+		PORT(S6B0108_PCMD) &= ~_BV(E);
+		_delay_us(2.5); // 0.5 should be enough but doesn't work
 	}
 	else
 	{	// reading status
 		PORT(S6B0108_PCMD) |= _BV(RW);
 		PORT(S6B0108_PCMD) &= ~_BV(RS);
+		_delay_us(0.2);
 	}
 	PORT(S6B0108_PCMD) |= _BV(E);
-	_delay_us(0.32);
+	_delay_us(1.2); // 0.32 should be enough but doesn't work
  	x = PIN(S6B0108_PDATA);
-	_delay_us(0.1);
+	_delay_us(0.2);
 	PORT(S6B0108_PCMD) &= ~_BV(E);
-	_delay_us(0.1);
+
 	PORT(S6B0108_PCMD) &= ~( _BV(RS) | _BV(RW) | _BV(E) );
 	return x;
-}
-
-/*
- * Wait until the busy flag is cleared.
- */
-static inline void s6b0108_wait_ready()
-{
-	while (s6b0108_incmd() & S6B0108_BUSY_FLAG); 
 }
 
 

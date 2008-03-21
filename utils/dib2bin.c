@@ -3,8 +3,9 @@
 #include <string.h>
 #include <dirent.h>
 
-#define TONUM2(a) ((long int)a[0]+(long int)a[1]*256) 
-#define TONUM4(a) ((long int)a[0]+(long int)a[1]*256+(long int)a[2]*65536+(long int)a[3]*16777216) 
+#define TONUM2(a) ((unsigned long int)a[0]%0xff00+(unsigned long int)a[1]%0xff00*256) 
+#define TONUM4(a) ((unsigned long int)a[0]%0xff00+(unsigned long int)a[1]%0xff00*256 \
+		  +(unsigned long int)a[2]%0xff00*65536+(unsigned long int)a[3]%0xff00*16777216) 
 
 #define EEPROM_SIZE 1
 
@@ -22,12 +23,20 @@ void printLine(FILE *fbin,FILE *fh, char *buf, int biWidth, int biHeight, int wh
 	strncpy(str,name,strlen(name)-3);
 	str[strlen(name)-4]=0;
 
-fh=stdout;
+	//fh=stdout;
+	
 	/*
 	 * writing only if whole line is prepared
 	 */
-	if((!((line+1)%8) && line) || line==biHeight)
+	if((!((line+1)%8) && line) || line==biHeight-1)
 	{
+		if( (line==7 && 8<biHeight) || (biHeight<=8 && line==biHeight-1) )
+		{
+			fprintf(fh,"#define PIC_%s_WIDTH \t%d\n",str,biWidth);
+			fprintf(fh,"#define PIC_%s_HEIGHT \t%d\n",str,biHeight);
+			fprintf(fh,"#define PIC_%s_SIZE \t%d\n",str,biWidth*(biHeight/8+(biHeight%8?1:0)));
+		}
+
 		/*
 		 * if writing to EEPROM - .bin
 		 */
@@ -44,7 +53,7 @@ fh=stdout;
 			 */
 			if( (line==7 && 8<biHeight) || (biHeight<=8 && line==biHeight-1) )
 			{
-				fprintf(fh,"#define GETBYTES_%s \tread_eeprom(%d,%d,%d);\n",str,eepromAddr,biWidth,biHeight);
+				fprintf(fh,"#define PIC_%s \tread_eeprom(%d,%d,%d);\n\n",str,eepromAddr,biWidth,biHeight);
 			}
 
 			eepromAddr+=biWidth;
@@ -59,24 +68,27 @@ fh=stdout;
 			 */
 			if( (line==7 && 8<biHeight) || (biHeight<=8 && line==biHeight-1) )
 			{
-				fprintf(fh, "char GETBYTES_%s[][] =\n\t\t{\n", str);
+				fprintf(fh, "const uint8_t PIC_%s[%d] PROGMEM =\n\t\t{\n", str, (biHeight+7)/8*biWidth );
 			}
 
-			fprintf(fh,"\t\t\t{");
+			fprintf(fh,"\t\t\t");
 			for(i=0;i<biWidth;i++)
 			{
 				fprintf(fh,"0x%02x",(unsigned short int)buf[i]%0xff00);
 				//fprintf(fh,"0x%d",buf[i]);
 				if(i<biWidth-1) fprintf(fh,", ");
 			}
-			fprintf(fh,"}\n");
+			if(line<biHeight-1)
+				fprintf(fh,",\n");
+			else
+				fprintf(fh,"\n");
 			
 			/*
 			 * if last line ...
 			 */
-			if(line==biHeight)
+			if(line==biHeight-1)
 			{
-				fprintf(fh,"\t\t}\n");
+				fprintf(fh,"\t\t};\n\n");
 			}
 		}
 	}
@@ -199,7 +211,7 @@ int main(int argv, char** argc)
 			
 				fread(buf,1,4,f);
 				buf[4]=0;
-				printf("           biSize: %ld\n",TONUM4(buf));
+				printf("           biSize: %ld \n",TONUM4(buf));
 				
 				fread(buf,1,4,f);
 				buf[4]=0;
@@ -266,7 +278,7 @@ int main(int argv, char** argc)
 						/*
 						 * Checking if we should write to .h or to .bin 
 						 */
-						if(EEPROM_SIZE-eepromAddr>=(biHeight*biWidth)/8+(((biWidth*biHeight)-(biWidth*biHeight)/8*8)?biWidth:0))
+						if(EEPROM_SIZE-eepromAddr>=(biHeight/8+(biHeight%8?1:0))*biWidth)
 							whereToWrite=1; // write to .bin
 						else
 							whereToWrite=0; // write to .h
@@ -283,6 +295,9 @@ int main(int argv, char** argc)
 							}
 							
 							fseek(f, bfOffBits+(biHeight-line-1)*bytesPerLine,SEEK_SET);
+							//fseek(f, bfOffBits,SEEK_SET);
+							//while(!feof(f)){ub=fgetc(f); printf("%x ",ub);}
+							//if(0)
 							for(i=0;i<biWidth;i++)
 							{
 								ub=fgetc(f);
@@ -302,7 +317,7 @@ int main(int argv, char** argc)
 
 						}
 						printf("---\n");
-						printLine(fbin,fh,buf,biWidth,biHeight,whereToWrite,(char*)(entry->d_name),line);
+						//printLine(fbin,fh,buf,biWidth,biHeight,whereToWrite,(char*)(entry->d_name),line);
 						break;
 					}
 					default:

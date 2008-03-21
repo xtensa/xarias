@@ -1,24 +1,33 @@
 PRG            = xarias
 OBJ_B01        = xarias_b01.o hd44780.o lcd.o 
-OBJ_B02        = xarias_b02.o s6b0108.o  
+OBJ_B02        = xarias_b02.o s6b0108.o gLCD.o 
 MCU_TARGET     = atmega32
 OPTIMIZE       = -Os
+F_CPU          = 16000000UL
 
 DEFS           =
 LIBS           =
 
 # You should not have to change anything below here.
 
-CC             = avr-gcc
+CC             = avr-gcc 
 
-CFLAGS        = -g -Wall $(OPTIMIZE) -mmcu=$(MCU_TARGET) $(DEFS)
+CFLAGS        = -g -Wall $(OPTIMIZE) -mmcu=$(MCU_TARGET) $(DEFS) -D "F_CPU=$(F_CPU)"
 LDFLAGS       = -Wl,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.16.1/ 
 
 OBJCOPY        = avr-objcopy
 OBJDUMP        = avr-objdump
 
+inst_b02: b02
+	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:xarias_b02.hex:i -v -E noreset
+
 all:
 	@echo "Use either \"make b01\" or \"make b02\" ."
+
+fuses:
+	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U hfuse:w:0xC9:m -v -E noreset
+	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U lfuse:w:0xFF:m -v -E noreset
+
 
 b01: $(PRG)_b01.elf lst_b01 text_b01
 #all: $(PRG).elf lst text eeprom

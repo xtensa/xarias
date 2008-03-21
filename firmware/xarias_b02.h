@@ -1,8 +1,6 @@
 #ifndef XARIAS_B02_h
 #define XARIAS_B02_h
 
-//#define F_CPU 8000000UL
-#define F_CPU 4000000UL
 
 #define MERGE(a,b) a##b
 #define DUMMY(a,b) MERGE(a,b)
