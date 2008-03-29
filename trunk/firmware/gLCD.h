@@ -71,14 +71,14 @@ void gLCD_pixel(uint16_t x, uint8_t y, bool onoff);
 /*
  * gLCD_line draw the line between points (x1,y1) and (x2,y2)
  */
-void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2);
+void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, bool onoff);
 
 
 /*
  * The following function draws rectangle frame. As point (x1,y1) 
  * and (x2,y2) you shoud give opposie vertices of the rectangle.
  */
-void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width);
+void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width, bool onoff);
 
 
 int  gLCD_putchar(char c, FILE *unused);

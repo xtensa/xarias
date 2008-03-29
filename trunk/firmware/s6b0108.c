@@ -61,10 +61,10 @@ void s6b0108_outbyte(uint8_t n, uint8_t rs)
 	{
 		PORT(S6B0108_PCMD) &= ~(_BV(RW)|_BV(RS));
 	}
-	_delay_us(0.14);
+	_delay_us(2.14);
 	PORT(S6B0108_PCMD) |= _BV(E);
 	PORT(S6B0108_PDATA)=n;
-	_delay_us(0.5); 
+	_delay_us(2.5); 
 	// 0.45 should be enough but doesn't work
 	PORT(S6B0108_PCMD) &= ~_BV(E);
 

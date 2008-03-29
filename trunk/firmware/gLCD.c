@@ -46,7 +46,7 @@ void gLCD_init()
 	_delay_us(10); //??
 
 	// turn off display power
-	B02_DOWN(LCD_POWER);
+	B02_PORT_UNSET(LCD_POWER);
 
 	// setting data direction for output ports
 	B02_DDR(LCD_POWER)  |= _BV(B02_LCD_POWER);
@@ -57,7 +57,7 @@ void gLCD_init()
 	
 	// swithing display power back after delay
 	_delay_us(5);
-	B02_UP(LCD_POWER);
+	B02_PORT_SET(LCD_POWER);
 	// wait 2us and bring power up ( 1us according to datasheet)
 	_delay_us(2);
 	PORT(S6B0108_PCMD) |= _BV(RST);
@@ -65,9 +65,9 @@ void gLCD_init()
 	// FIXME: first screen clearence should be done twice
 	//        For unkown reason first cls leave garbage on screen
 	gLCD_cls();
-	gLCD_cls();
+	//gLCD_cls();
 
-	stderr = &gLCD_str;
+	stdout = &gLCD_str;
 	init_font5x7();
 }
 
@@ -239,7 +239,7 @@ void gLCD_pixel(uint16_t x, uint8_t y, bool onoff)
 /*
  * gLCD_line draw the line between points (x1,y1) and (x2,y2)
  */
-void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
+void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, bool onoff)
 {
 	int8_t j;
 	int16_t x,y;
@@ -257,7 +257,7 @@ void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
 		{
 			y=y1+((int16_t)x-(int16_t)x1)/(((int16_t)x2-(int16_t)x1+(x2>x1?1:-1))/((int8_t)y2-(int8_t)y1+(y2>y1?1:-1)));
 			if((y2>y1 && y>y2) || (y2<y1 && y<y2)) y=y2;
-			gLCD_pixelon(x,y);
+			gLCD_pixel(x,y,onoff);
 		}
 	}
 	else
@@ -267,7 +267,7 @@ void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
 		{
 			x=x1+((int16_t)y-(int16_t)y1)/(((int16_t)y2-(int16_t)y1+(y2>y1?1:-1))/((int8_t)x2-(int8_t)x1+(x2>x1?1:-1)));
 			if((x2>x1 && x>x2) || (x2<x1 && x<x2)) x=x2;
-			gLCD_pixelon(x,y);
+			gLCD_pixel(x,y,onoff);
 		}
 	}
 
@@ -277,7 +277,7 @@ void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2)
  * The following function draws rectangle frame. As point (x1,y1) 
  * and (x2,y2) you shoud give opposie vertices of the rectangle.
  */
-void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width)
+void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width, bool onoff)
 {
 	uint8_t i;
 	/*
@@ -289,10 +289,10 @@ void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width)
 
 	for(i=0;i<width;i++)
 	{
-		gLCD_line(x1+i+1,y1+i,x2-i,y1+i);
-		gLCD_line(x2-i,y1+i+1,x2-i,y2-i);
-		gLCD_line(x2-i-1,y2-i,x1+i,y2-i);
-		gLCD_line(x1+i,y2-i-1,x1+i,y1+i);
+		gLCD_line(x1+i+1,y1+i,x2-i,y1+i,onoff);
+		gLCD_line(x2-i,y1+i+1,x2-i,y2-i,onoff);
+		gLCD_line(x2-i-1,y2-i,x1+i,y2-i,onoff);
+		gLCD_line(x1+i,y2-i-1,x1+i,y1+i,onoff);
 	}	
 }
 
@@ -408,7 +408,7 @@ void gLCD_alert(char *str)
 	for(i=0,j=0;i<=50 && j<=30;i+=25,j+=15)
 	{
 		gLCD_fill_rect(63-i,31-j,64+i,33+j,0);
-		gLCD_frame(63-i,31-j,64+i,33+j,1);
+		gLCD_frame(63-i,31-j,64+i,33+j,1,true);
 	}
 
 	gLCD_echo(x,y,str);

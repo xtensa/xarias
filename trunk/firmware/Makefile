@@ -1,6 +1,6 @@
 PRG            = xarias
 OBJ_B01        = xarias_b01.o hd44780.o lcd.o 
-OBJ_B02        = xarias_b02.o s6b0108.o gLCD.o 
+OBJ_B02        = xarias_b02.o s6b0108.o gLCD.o twi_devs.o 
 MCU_TARGET     = atmega32
 OPTIMIZE       = -Os
 F_CPU          = 16000000UL
@@ -18,11 +18,11 @@ LDFLAGS       = -Wl,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.16.1/
 OBJCOPY        = avr-objcopy
 OBJDUMP        = avr-objdump
 
-inst_b02: b02
-	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:xarias_b02.hex:i -v -E noreset
-
 all:
 	@echo "Use either \"make b01\" or \"make b02\" ."
+
+inst_b02: b02
+	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:xarias_b02.hex:i -v -E noreset
 
 fuses:
 	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U hfuse:w:0xC9:m -v -E noreset
@@ -57,13 +57,14 @@ lst_b02:  $(PRG)_b02.lst
 text_b01: hex_b01 
 #text: hex bin srec
 
-text_b02: hex_b02 
+text_b02: hex_b02 bin_b02
 
 hex_b01:  $(PRG)_b01.hex
 #bin:  $(PRG).bin
 #srec: $(PRG).srec
 
 hex_b02:  $(PRG)_b02.hex
+bin_b02:  $(PRG)_b02.bin
 
 %.hex: %.elf
 	$(OBJCOPY) -j .text -j .data -O ihex $< $@
@@ -71,8 +72,8 @@ hex_b02:  $(PRG)_b02.hex
 #%.srec: %.elf
 #	$(OBJCOPY) -j .text -j .data -O srec $< $@
 
-#%.bin: %.elf
-#	$(OBJCOPY) -j .text -j .data -O binary $< $@
+%.bin: %.elf
+	$(OBJCOPY) -j .text -j .data -O binary $< $@
 
 # Rules for building the .eeprom rom images
 
