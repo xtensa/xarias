@@ -6,7 +6,7 @@
 /*
  * Font 5x7 mapping table
  */
-const prog_uint8_t *font5x7[256] ={NULL};
+const prog_uint8_t *font5x7[256] PROGMEM = {NULL};
 
 void init_font5x7()
 {

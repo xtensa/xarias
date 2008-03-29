@@ -1,7 +1,7 @@
 /*
  * XARIAS carputer project
  *
- * Copyright (c) 2007 by Roman Pszonczenko xtensa <_at_> go0ogle mail
+ * Copyright (c) 2008 by Roman Pszonczenko xtensa <_at_> go0ogle mail
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -35,12 +35,14 @@
 #include <avr/interrupt.h>
 
 #include "gLCD.h"
-#include "../utils/out.h"
+#include "twi_devs.h"
+//#include "../utils/out.h"
 
 #define PIN_INJ   PIND&_BV(3)
 #define PORT_INJ  PORTD|_BV(3)
 
 
+#define _NOP __asm__ volatile ("nop"::);
 
 /*
  * Injector flow constant in ml/min
@@ -55,43 +57,107 @@
 #define SPEED_TICKS 2548
 
 
-uint32_t passed_seconds=0, tcnt0_overs=0, passed_speed_ticks=0;
-uint16_t clock_ticks=0, inj_ticks=0, tcnt0_overs_sec=0;
-///////////////////////////////
+//#define KB_SET(i)   kb_state |=  _BV(i)
+//#define KB_UNSET(i) kb_state &= ~_BV(i)
+
+#define MODE_TRIP_SETTINGS	0x00
+#define MODE_AIRCON_SETTINGS	0x01
+#define MODE_DATETIME_SETTINGS	0x02
+#define MODE_SCREEN_ADJUST	0x03
+#define MODE_SERVICE		0x04
+#define MODE_MAIN		0x05
+#define MODE_MENU		0x06
 
 
 
-void error(char *msg)
+/*
+ * Main menu variables.
+ */
+uint8_t mainmenu_pos=0;
+#define MAIN_MENU_COUNT 6
+char mainmenu_strings[6][19]={	"Trip settings",
+				"AirCon settings",
+				"Date/Time settings",
+				"Screen adjustment",
+				"Service mode",
+				"Exit"};
+
+
+/*
+ * Action flags
+ * To save RAM space several flags are stored in separate
+ * bits of this action flag byte
+ */
+uint8_t aflags;
+#define AFLAGS_SET(a) 	aflags|=_BV(a)
+#define AFLAGS_UNSET(a) aflags&=~_BV(a)
+#define AFLAGS_ISSET(a) (aflags&_BV(a))
+#define FLAG_LCD_UPDATE   	0
+#define FLAG_MODE_CHANGED 	1
+#define FLAG_KB_STH_PRESSED 	2
+
+/*
+ * This array is used to store keyboard states
+ */
+uint8_t kb_state[12]={0};
+#define KB_UP 		kb_state[1]
+#define KB_DOWN 	kb_state[5]
+#define KB_LEFT		kb_state[3]
+#define KB_RIGHT	kb_state[2]
+#define KB_OK 		kb_state[0]
+#define KB_FUNC1	kb_state[9]
+#define KB_FUNC2	kb_state[8]
+#define KB_FUNC3	kb_state[10]
+#define KB_FUNC4	kb_state[11]
+#define KB_FUNC5	kb_state[7]
+#define KB_FUNC6	kb_state[6]
+#define KB_FUNC7	kb_state[4]
+
+#define KB_ESC		KB_FUNC7
+
+/*
+ * The following variable is used to store current working mode
+ */
+uint8_t modestate;
+
+/*
+ * Use only this function to change mode. Do not change mode directly.
+ */
+void inline set_mode(uint8_t mode)
 {
+	modestate=mode;
+	aflags|=_BV(FLAG_MODE_CHANGED)|_BV(FLAG_LCD_UPDATE);
 	gLCD_cls();
-	gLCD_alert(msg);
-	gLCD_echo(14,4,"ERROR:");
 }
 
 
 /*
- * This function sends one byte through TWI bus.
- * It returns 0 on success and 1 if failed.
+ * All variables for calculating speed, rpm, fuel consumption, etc.
  */
-uint8_t twi_write_data(uint8_t data)
+uint16_t tcnt0_overs_sec=0, speed_ticks=0;
+uint64_t passed_inj_ticks=0;
+uint32_t passed_seconds=0, tcnt0_overs=0, passed_speed_ticks=0;
+volatile uint16_t last_inj_ticks=0, rpm_ticks=0, clock_ticks=0;
+///////////////////////////////
+
+
+
+
+
+
+
+
+#define error(x) error_(x,1)
+
+void error_(char *msg, uint8_t data)
 {
-	TWDR = data;
-	TWCR = _BV(TWINT) | _BV(TWEN);
-
-	/*
-	 * waiting for TWINT flag set
-	 */
-	while (!(TWCR & _BV(TWINT)));
-
-	if ( TW_STATUS != TW_MT_DATA_ACK) 
-	{
-		error("MT_DATA_ACK cmd");
-		return 1;
-	}
-	return 0;
+	uint8_t i;
+	gLCD_cls();
+	gLCD_alert(msg);
+	gLCD_locate(15,3);
+	fprintf(stdout,"ERROR: %u", data);
+	for(i=0;i<200;i++) _delay_ms(500);
 }
-
-
 
 
 /*
@@ -99,46 +165,25 @@ uint8_t twi_write_data(uint8_t data)
  */
 static void xarias_init(void)
 {
+	/*
+	 * Setting up TWI bus.
+	 */
+	twi_init();
+	twi_start();
 
 	/*
-	 * SCL = CPU_Freq / ( 16 + 2 * TWBR * 4^TWPS )
+	 * Sending device address 1101 000 of DS1307 chip
 	 */
-
-	TWBR = 98; // with prescaller = 1 gives us 100kHz TWI bus
-	TWSR = 0;  // prescaller = 1
-
-	/*
-	 * enablibg TWI and sending START condition
-	 */
-	TWCR = _BV(TWINT)|_BV(TWSTA)|_BV(TWEN);
-
-	/*
-	 * waiting for TWINT flag set
-	 */
-	while (!(TWCR & _BV(TWINT)));
-
-	
-	if ( TW_STATUS != TW_START) error("TWI START cmd");
-
-
-	/*
-	 * writing SLA_W and device address 1101 000
-	 */
-	TWDR = TW_WRITE | 0xD0; 
-	TWCR = _BV(TWINT) | _BV(TWEN);
-
-	/*
-	 * waiting for TWINT flag set
-	 */
-	while (!(TWCR & _BV(TWINT)));
-
-	if ( TW_STATUS != TW_MT_SLA_ACK) error("MT_SLA_ACK cmd");
+	twi_write_addr(0xD0);
 
 	/*
 	 * writing address start 0
 	 */
 	twi_write_data(0);
 
+	/*
+	 * Writing time registers
+	 */
 	twi_write_data(0);
 	twi_write_data(0);
 	twi_write_data(0);
@@ -153,8 +198,43 @@ static void xarias_init(void)
 	 */
 	twi_write_data(_BV(4)|_BV(0)|_BV(1));
 
-	TWCR = _BV(TWINT)|_BV(TWEN)|_BV(TWSTO);
+	
+	/*
+	 * Stopping TWI communication
+	 */
+	twi_stop();
 
+	_delay_us(10);
+
+
+	/*
+	 * Disabling self-programming feature
+	 */
+	SPCR &= ~_BV(SPE);
+
+	/*
+	 * ---------- Setting keyboard -----------
+	 *
+	 *  Setting keyboard rows as output and turning on pull-ups
+	 */
+	B02_DDR_SET(KB_ROW1);
+	B02_DDR_SET(KB_ROW2);
+	B02_DDR_SET(KB_ROW3);
+	B02_PORT_SET(KB_ROW1);
+	B02_PORT_SET(KB_ROW2);
+	B02_PORT_SET(KB_ROW3);
+	/*
+	 * Setting keyboard columns as input
+	 */
+	B02_PORT_SET(KB_COL1);
+	B02_PORT_SET(KB_COL2);
+	B02_PORT_SET(KB_COL3);
+	B02_PORT_SET(KB_COL4);
+	B02_DDR_UNSET(KB_COL1);
+	B02_DDR_UNSET(KB_COL2);
+	B02_DDR_UNSET(KB_COL3);
+	B02_DDR_UNSET(KB_COL4);
+	/* --------------------------------------------------- */
 
 
 
@@ -192,7 +272,7 @@ static void xarias_init(void)
 	 */
 	sei();
 
-
+	set_mode(MODE_MAIN);
 }
 
 /*
@@ -266,83 +346,370 @@ uint32_t power(uint32_t x, uint8_t y)
 #define ROUND2(val,mult,prec) (uint16_t)(CUT(ROUND(val,mult,prec)-CUT(ROUND(val,mult,prec),mult)*power(10,(uint8_t)mult),mult-prec))
 
 
+void if_draw_progressbar(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t percent)
+{
+	uint8_t xx=x1+(uint8_t)((x2-x1)*percent/100);
+	if(x1>=x2 || y1>=y2 || y2-y1<2 || x2-x1<2) return; 
+	gLCD_frame(x1,y1,x2,y2,1,true);
+	gLCD_fill_rect(x1,y1,xx,y2,0xff);
+	gLCD_fill_rect(xx+1,y1+1,x2-1,y2-1,0x00);
+}
+
+void kb_set(uint8_t i, uint8_t j, uint8_t is_on)
+{
+	gLCD_locate(i*29,j*10);
+	if(is_on)
+		fprintf(stdout,"%u/%u",i,j);
+	else
+		fprintf(stdout,"%u-%u",i,j);
+}
+
+uint8_t inline kb_column_getstate(uint8_t col)
+{
+	if(col==0) return B02_GETSTATE(KB_COL1);
+	if(col==1) return B02_GETSTATE(KB_COL2);
+	if(col==2) return B02_GETSTATE(KB_COL3);
+	if(col==3) return B02_GETSTATE(KB_COL4);
+	return 0;
+}
+
 int main()
 {
+	uint8_t i,j,k=104, l=80;
+	uint8_t pin;
+
+
+	/*
+	 * Wait for power to stabilize
+	 */
+	_delay_ms(20);
 
 	gLCD_init();
 	xarias_init();
+					ds1803_write(0,k);
+					ds1803_write(1,l);
+	
+	while(1)
+	{
+		uint8_t kb_sth_pressed=0;
+		/*
+		 * Keyboard routine
+		 */
+		for(j=0;j<3;j++)
+		{
+			if(j==0) B02_PORT_UNSET(KB_ROW1); else B02_PORT_SET(KB_ROW1);
+			if(j==1) B02_PORT_UNSET(KB_ROW2); else B02_PORT_SET(KB_ROW2);
+			if(j==2) B02_PORT_UNSET(KB_ROW3); else B02_PORT_SET(KB_ROW3);
+
+
+			for(i=0;i<4;i++)
+			{
+				if(!(pin=kb_column_getstate(i)))
+				{
+					_delay_us(100);
+					if(!(pin=kb_column_getstate(i)))
+					{
+						kb_state[i+j*4]++;
+						kb_sth_pressed=1;
+					}
+				}
+				else
+				{
+					kb_state[i+j*4]=0;
+				}
+			//	kb_set(i,j,!pin);
+				if(AFLAGS_ISSET(FLAG_MODE_CHANGED)) kb_state[i+j*4]=0;
+
+			}
+		} // end keyboard routine
+
+		if(!kb_sth_pressed) AFLAGS_UNSET(FLAG_MODE_CHANGED);
+		
+		/*
+		 * key processing logics
+		 */
+		switch(modestate)
+		{
+			case MODE_MAIN:
+			{
+				if(KB_OK) 
+				{ 
+					set_mode(MODE_MENU); 
+				}
+			} break;
+
+			case MODE_MENU:
+			{
+				if(KB_DOWN==1 || KB_DOWN==50) 
+				{ 
+					mainmenu_pos++;
+					mainmenu_pos%=MAIN_MENU_COUNT;
+					AFLAGS_SET(FLAG_LCD_UPDATE); 
+					if(KB_DOWN==50) KB_DOWN=49;
+				}
+				if(KB_UP==1 || KB_UP==50) 
+				{ 
+					if(mainmenu_pos)
+						mainmenu_pos--;
+					else
+						mainmenu_pos=MAIN_MENU_COUNT-1;
+					AFLAGS_SET(FLAG_LCD_UPDATE); 
+					if(KB_UP==50) KB_UP=49;
+				}
+				if(KB_OK)
+				{
+					set_mode(mainmenu_pos);
+					if(mainmenu_pos==MODE_MAIN) mainmenu_pos=0;
+				}
+				if(KB_ESC) 
+				{
+					set_mode(MODE_MAIN);
+					mainmenu_pos=0;
+				}
+
+			} break;
+
+			case MODE_SCREEN_ADJUST:
+			{
+				if(KB_ESC) 
+				{
+					set_mode(MODE_MENU);
+				}
+
+				if(KB_LEFT==1 || KB_LEFT==50)
+				{
+					if(k>SCREEN_CONTRAST_MIN) k--;
+					if(KB_LEFT==50) KB_LEFT=49;
+					AFLAGS_SET(FLAG_LCD_UPDATE); 
+				}
+	
+				if(KB_RIGHT==1 || KB_RIGHT==50)
+				{
+					if(k<SCREEN_CONTRAST_MAX) k++;
+					if(KB_RIGHT==50) KB_RIGHT=49;
+					AFLAGS_SET(FLAG_LCD_UPDATE); 
+				}
+	
+				if(KB_DOWN==1 || KB_DOWN==50)
+				{
+					if(l>SCREEN_BRIGHTNESS_MIN) l--;
+					if(KB_DOWN==50) KB_DOWN=49;
+					AFLAGS_SET(FLAG_LCD_UPDATE); 
+				}
+	
+				if(KB_UP==1 || KB_UP==50)
+				{
+					if(l<SCREEN_BRIGHTNESS_MAX) l++;
+					if(KB_UP==50) KB_UP=49;
+					AFLAGS_SET(FLAG_LCD_UPDATE); 
+				}
+			} break;
+
+			case MODE_TRIP_SETTINGS:
+			{
+				if(KB_ESC)
+				{
+					set_mode(MODE_MENU);
+				}
+			} break;
+
+			case MODE_AIRCON_SETTINGS:
+			{
+				if(KB_ESC)
+				{
+					set_mode(MODE_MENU);
+				}
+			} break;
+
+			case MODE_DATETIME_SETTINGS:
+			{
+				if(KB_ESC)
+				{
+					set_mode(MODE_MENU);
+				}
+			} break;
+
+			case MODE_SERVICE:
+			{
+				if(KB_ESC)
+				{
+					set_mode(MODE_MENU);
+				}
+			} break;
+
+			default: error_("Unkown mode", modestate);
+		}
+		/*
+		 **************************************************
+		*/
+
+
+		if(AFLAGS_ISSET(FLAG_LCD_UPDATE))
+		{
+			AFLAGS_UNSET(FLAG_LCD_UPDATE); 
+
+			switch(modestate)
+			{
+				case MODE_MENU:
+				{
+					if(AFLAGS_ISSET(FLAG_MODE_CHANGED))
+					{
+						gLCD_frame(0,0,127,63,1,true);
+						for(i=0;i<MAIN_MENU_COUNT;i++)
+						{
+							gLCD_locate(4,4+i*10);
+							fprintf(stdout,"%s",mainmenu_strings[i]);
+						}
+					}
+					for(i=0;i<MAIN_MENU_COUNT;i++)
+						gLCD_frame(2,i*10+2,125,i*10+12,1,false);
+					gLCD_frame(2,mainmenu_pos*10+2,125,mainmenu_pos*10+12,1,true);
+				} break;
+			
+				case MODE_MAIN:
+				{
+					uint16_t m_speed_m, m_speed_km, avg_speed_m, avg_speed_km;
+					uint16_t m_fuel_h, m_fuel_100, avg_fuel_h, avg_fuel_100;
+					uint32_t passed_distance;
+	
+					passed_distance=passed_speed_ticks*1000/SPEED_TICKS;
+		
+		
+					m_fuel_h     = calc_fuel_h(last_inj_ticks,1);
+					m_fuel_100   = calc_fuel_100(m_fuel_h,speed_ticks,1);
+					avg_fuel_h   = calc_fuel_h(passed_inj_ticks,passed_seconds);
+					avg_fuel_100 = calc_fuel_100(avg_fuel_h,passed_speed_ticks,passed_seconds);
+			
+					m_speed_m    = calc_speed_m(speed_ticks,1);
+					m_speed_km   = m_speed_m * 36 / 10;
+					avg_speed_m  = calc_speed_m(passed_speed_ticks,passed_seconds);
+					avg_speed_km = avg_speed_m * 36 / 10;
+		
+					gLCD_locate(0,40);
+					fprintf(stdout,"Inject  Speed   RPM");
+					gLCD_locate(0,50);
+					fprintf(stdout,"%5u  %5u  %5u",last_inj_ticks,speed_ticks,rpm_ticks*20);
+
+					// printing speed in km/h and m/s
+					gLCD_locate(0,0);
+					fprintf(stdout, "%3u km/h  %3u m/s",m_speed_km,m_speed_m);
+	//				fprintf(stdout, "-");
+	//				gLCD_echo(0,0,"-");
+			
+					// printing fuel consumption
+					gLCD_locate(0,8);
+					fprintf(stdout, " %3u.%u l/100km %2u.%u",ROUND1(m_fuel_100,3,1),ROUND2(m_fuel_100,3,1),ROUND1(m_fuel_h,3,1),ROUND2(m_fuel_h,3,1));
+			
+					// temporarily: checking for error
+					if(ROUND2(m_fuel_100,3,1)>9) { gLCD_locate(0,0); fprintf(stdout,"%u",m_fuel_100); while(1);}
+					
+					// avarage speed and fuel consumption
+					gLCD_locate(0,16);
+					fprintf(stdout, "%3u km/h %3u.%u l/100",avg_speed_km,ROUND1(avg_fuel_100,3,1),ROUND2(avg_fuel_100,3,1));
+						
+					// printing journey time
+					gLCD_locate(0,24);
+					fprintf(stdout,"%02u:%02u:%02u", (uint8_t)(passed_seconds/3600),(uint8_t)((passed_seconds%3600)/60),(uint8_t)(passed_seconds%60));
+			
+					// printing passed dist
+					gLCD_locate(50,24);
+					fprintf(stdout, "%4u.%03u km",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
+				
+				} break;
+
+
+				case MODE_SCREEN_ADJUST:
+				{
+					uint8_t scr_tmp;
+
+					gLCD_frame(0,0,127,63,1,true);
+					gLCD_locate(14,3);
+					fprintf(stdout,"SCREEN ADJUSTMENT");
+
+					scr_tmp=((uint16_t)k-SCREEN_CONTRAST_MIN)*100/(SCREEN_CONTRAST_MAX-SCREEN_CONTRAST_MIN);
+					gLCD_locate(5,18);
+					fprintf(stdout,"Contrast LEFT/RIGHT");
+					if_draw_progressbar(3,27,99,34,scr_tmp);
+					gLCD_locate(102,27);
+					fprintf(stdout,"%3u%%",scr_tmp);
+
+					scr_tmp=((uint16_t)l-SCREEN_BRIGHTNESS_MIN)*100/(SCREEN_BRIGHTNESS_MAX-SCREEN_BRIGHTNESS_MIN);
+					gLCD_locate(5,40);
+					fprintf(stdout,"Brightness UP/DOWN");
+					if_draw_progressbar(3,49,99,56,scr_tmp);
+					gLCD_locate(102,49);
+					fprintf(stdout,"%3u%%",scr_tmp);
+
+					ds1803_write(0,k);
+					ds1803_write(1,l);
+				} break;
+			
+				case MODE_TRIP_SETTINGS:
+				{
+					gLCD_locate(2,2);
+					fprintf(stdout,"Trip settings mode");
+				} break;
+
+				case MODE_AIRCON_SETTINGS:
+				{
+					gLCD_locate(2,2);
+					fprintf(stdout,"AirCon settings mode");
+				} break;
+
+				case MODE_DATETIME_SETTINGS:
+				{
+					gLCD_locate(2,2);
+					fprintf(stdout,"Datetime mode");
+				} break;
+
+				case MODE_SERVICE:
+				{
+					gLCD_locate(2,2);
+					fprintf(stdout,"Service mode");
+				} break;
+
+				default: error_("Display unkown mode", modestate);
+			} // switch
+		} // if(AFLAGS_ISSET(FLAG_LCD_UPDATE))
+		else
+		{
+			if(!AFLAGS_ISSET(FLAG_MODE_CHANGED)) _delay_ms(5);
+		}
+	}
 	return 0;
 }
 
 
 SIGNAL(SIG_INTERRUPT0)
 {
-	static uint64_t passed_inj_ticks=0;
-
-	uint8_t pin_inj_state=PIN_INJ;
+	uint8_t pin_inj_state=PIN_INJ, tcnt0;
+	static uint16_t inj_ticks;
+	
 	if(!pin_inj_state) inj_ticks++;
 
 	if(!clock_ticks)
 	{
-		uint16_t m_speed_m, m_speed_km, avg_speed_m, avg_speed_km;
-		uint16_t m_fuel_h, m_fuel_100, avg_fuel_h, avg_fuel_100, speed_ticks;
-		uint32_t passed_distance;
-		uint8_t  tcnt0;
-		
 		tcnt0=TCNT0;
 		TCNT0=0;
-		tcnt0_overs_sec=0;
-
 		speed_ticks=tcnt0_overs_sec*256+tcnt0;
-		passed_speed_ticks += speed_ticks;
-		passed_inj_ticks += inj_ticks;
-		passed_distance=passed_speed_ticks*1000/SPEED_TICKS;
-
+		tcnt0_overs_sec=0;
+		
+		rpm_ticks=TCNT1;
 		TCNT1=0;
-
-		gLCD_locate(0,40);
-		fprintf(stderr,"Inject  Speed   RPM");
-		gLCD_locate(0,50);
-		fprintf(stderr,"%5u  %5u  %5u",inj_ticks,speed_ticks,TCNT1);
-
-		m_fuel_h     = calc_fuel_h(inj_ticks,1);
-		m_fuel_100   = calc_fuel_100(m_fuel_h,speed_ticks,1);
-		avg_fuel_h   = calc_fuel_h(passed_inj_ticks,passed_seconds);
-		avg_fuel_100 = calc_fuel_100(avg_fuel_h,passed_speed_ticks,passed_seconds);
-
-		m_speed_m    = calc_speed_m(speed_ticks,1);
-		m_speed_km   = m_speed_m * 36 / 10;
-		avg_speed_m  = calc_speed_m(passed_speed_ticks,passed_seconds);
-		avg_speed_km = avg_speed_m * 36 / 10;
-
-		// printing speed in km/h and m/s
-		gLCD_locate(0,0);
-		fprintf(stderr, "%3u km/h  %3u m/s",m_speed_km,m_speed_m);
-//		fprintf(stderr, "-");
-//		gLCD_echo(0,0,"-");
-
-		// printing fuel consumption
-		gLCD_locate(0,8);
-		fprintf(stderr, " %3u.%u l/100km %2u.%u",ROUND1(m_fuel_100,3,1),ROUND2(m_fuel_100,3,1),ROUND1(m_fuel_h,3,1),ROUND2(m_fuel_h,3,1));
-
-		// temporarily: checking for error
-		if(ROUND2(m_fuel_100,3,1)>9) { gLCD_locate(0,0); fprintf(stderr,"%u",m_fuel_100); while(1);}
 		
-		// avarage speed and fuel consumption
-		gLCD_locate(0,16);
-		fprintf(stderr, "%3u km/h %3u.%u l/100",avg_speed_km,ROUND1(avg_fuel_100,3,1),ROUND2(avg_fuel_100,3,1));
-		
-		// printing journey time
-		gLCD_locate(0,24);
-		fprintf(stderr,"%02u:%02u:%02u", (uint8_t)(passed_seconds/3600),(uint8_t)((passed_seconds%3600)/60),(uint8_t)(passed_seconds%60));
 
-		// printing passed dist
-		gLCD_locate(50,24);
-		fprintf(stderr, "%4u.%03u km",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
-		
 		passed_seconds++;
+		if(rpm_ticks) last_inj_ticks=inj_ticks;
 		inj_ticks=0;
-		
+	
+		passed_speed_ticks += speed_ticks;
+		passed_inj_ticks += last_inj_ticks;
+	
+
+		if(modestate==MODE_MAIN)
+		{
+			AFLAGS_SET(FLAG_LCD_UPDATE);
+		}
 	}
 
 	clock_ticks++;
