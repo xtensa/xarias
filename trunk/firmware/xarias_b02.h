@@ -28,6 +28,10 @@
 #define SCREEN_BRIGHTNESS_MAX 150
 
 
+#define TWIADDR_DS1307 		0xD0
+#define TWIADDR_MAINPOT 	0x50
+
+
 /*
  * It is assumed that pins of LCD are connected
  * to corresponding pins of MCU, e.g. 0 to 0,

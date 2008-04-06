@@ -174,7 +174,7 @@ static void xarias_init(void)
 	/*
 	 * Sending device address 1101 000 of DS1307 chip
 	 */
-	twi_write_addr(0xD0);
+	twi_write_addr(TWIADDR_DS1307);
 
 	/*
 	 * writing address start 0
@@ -183,14 +183,15 @@ static void xarias_init(void)
 
 	/*
 	 * Writing time registers
+	 * Important to enable CH bit in register 0
 	 */
-	twi_write_data(0);
-	twi_write_data(0);
-	twi_write_data(0);
-	twi_write_data(0);
-	twi_write_data(0);
-	twi_write_data(0);
-	twi_write_data(0);
+	twi_write_data(51); 
+	twi_write_data(1);
+	twi_write_data(1);
+	twi_write_data(1);
+	twi_write_data(1);
+	twi_write_data(1);
+	twi_write_data(1);
 
 	/*
 	 * writing control register
@@ -572,6 +573,15 @@ int main()
 					uint16_t m_fuel_h, m_fuel_100, avg_fuel_h, avg_fuel_100;
 					uint32_t passed_distance;
 	
+					uint8_t seconds;
+					uint8_t minutes;
+					bool is12h;
+					uint8_t hours;
+					uint8_t day;
+					uint8_t date;
+					uint8_t month;
+					uint8_t year;
+
 					passed_distance=passed_speed_ticks*1000/SPEED_TICKS;
 		
 		
@@ -584,12 +594,12 @@ int main()
 					m_speed_km   = m_speed_m * 36 / 10;
 					avg_speed_m  = calc_speed_m(passed_speed_ticks,passed_seconds);
 					avg_speed_km = avg_speed_m * 36 / 10;
-		
+		/*
 					gLCD_locate(0,40);
 					fprintf(stdout,"Inject  Speed   RPM");
 					gLCD_locate(0,50);
 					fprintf(stdout,"%5u  %5u  %5u",last_inj_ticks,speed_ticks,rpm_ticks*20);
-
+*/
 					// printing speed in km/h and m/s
 					gLCD_locate(0,0);
 					fprintf(stdout, "%3u km/h  %3u m/s",m_speed_km,m_speed_m);
@@ -614,6 +624,15 @@ int main()
 					// printing passed dist
 					gLCD_locate(50,24);
 					fprintf(stdout, "%4u.%03u km",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
+
+
+					ds1307_read_time(&seconds, &minutes, &is12h, &hours, &day, &date, &month, &year);
+					gLCD_locate(0,33);
+					fprintf(stdout,"%02u-%02u-%02u  %u", date, month, year, day);
+					gLCD_locate(0,42);
+					fprintf(stdout,"%02u:%02u:%02u  %u", hours, minutes, seconds, (uint8_t)is12h );
+ 
+
 				
 				} break;
 

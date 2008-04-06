@@ -42,7 +42,7 @@ $(PRG)_b02.elf: $(OBJ_B02)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
-	rm -rf *.o $(PRG).elf *.eps *.png *.pdf *.bak
+	rm -rf *.o $(PRG).elf *.eps *.png *.pdf *.bak *.bin
 	rm -rf *.lst *.map $(EXTRA_CLEAN_FILES)
 
 lst_b01:  $(PRG)_b01.lst
