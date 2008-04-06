@@ -20,8 +20,14 @@
 
 #include <util/delay.h>
 #include <util/twi.h>
+#include <stdbool.h>
+
+#include "xarias_b02.h"
 
 #define error(x) error_(x,0)
+#define VAL_TO_DS1307(x) x=(((x)/10)<<4)|((x)-(x)/10*10)
+#define DS1307_TO_VAL(x) x=((x)>>4)*10+((x)&0x0F)
+
 extern void error_(char *msg, uint8_t data);
 
 /*
@@ -48,16 +54,16 @@ void inline twi_start()
 	 * waiting for TWINT flag set
 	 */
 	while (!(TWCR & _BV(TWINT)));
-	if ( TW_STATUS != TW_START) error("TWI START cmd");
+	if ( TW_STATUS != TW_START && TW_STATUS != TW_REP_START ) error("TWI START cmd");
 }
 
 /*
  * This function sends the device address through TWI bus.
  * It returns 0 on success and 1 if failed.
  */
-uint8_t twi_write_addr(uint8_t addr)
+uint8_t twi_rw_addr(uint8_t addr, uint8_t mode)
 {
-	TWDR = TW_WRITE | addr; 
+	TWDR = mode | addr; 
 	TWCR = _BV(TWINT) | _BV(TWEN);
 
 	/*
@@ -65,13 +71,23 @@ uint8_t twi_write_addr(uint8_t addr)
 	 */
 	while (!(TWCR & _BV(TWINT)));
 
-	if ( TW_STATUS != TW_MT_SLA_ACK) 
+	if ( TW_STATUS != (mode==TW_WRITE ? TW_MT_SLA_ACK : TW_MR_SLA_ACK) ) 
 	{
-		error("MT_SLA_ACK cmd");
+		error("Mx_SLA_ACK cmd");
 		return 1;
 	}
 
 	return 0;
+}
+
+uint8_t twi_write_addr(uint8_t addr) 
+{
+	return twi_rw_addr(addr,TW_WRITE);
+}
+
+uint8_t twi_read_addr(uint8_t addr)
+{
+	return twi_rw_addr(addr,TW_READ);
 }
 
 /*
@@ -97,6 +113,28 @@ uint8_t twi_write_data(uint8_t data)
 }
 
 
+uint8_t twi_read_data(uint8_t *data, bool islast)
+{
+
+	TWCR = _BV(TWINT) | _BV(TWEN) | (islast?0:_BV(TWEA));
+
+	/*
+	 * waiting for TWINT flag set
+	 */
+	while (!(TWCR & _BV(TWINT)));
+
+	if ( islast && TW_STATUS != TW_MR_DATA_NACK) 
+	{
+		error("MR_DATA_NACK cmd");
+	}
+	if ( !islast && TW_STATUS != TW_MR_DATA_ACK) 
+	{
+		error("MR_DATA_ACK cmd");
+	}
+	*data = TWDR;
+	return 0; 
+
+}
 
 
 /*
@@ -119,7 +157,7 @@ void ds1803_write(uint8_t pot, uint8_t val)
 	 * Initializing potentiometers
 	 * Sending device address 0101 000 for DS1803 chip
 	 */
-	twi_write_addr(0x50); 
+	twi_write_addr(TWIADDR_MAINPOT); 
 
 
 	if(!pot)
@@ -136,4 +174,87 @@ void ds1803_write(uint8_t pot, uint8_t val)
 	 * According to DS1803 docs 4.5us should be enough, but it's not.
 	 */
 	_delay_us(10);
+}
+
+uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, uint8_t hours, uint8_t date, uint8_t month, uint8_t year)
+{
+	uint8_t new_val;
+
+	if(seconds>59) return 1;
+	VAL_TO_DS1307(seconds);
+	seconds &= 0x7F;
+
+	if(minutes>59) return 2;
+	VAL_TO_DS1307(minutes);
+
+	if( hours > 23 ) return 3;
+	new_val=0;
+	if( is12h ) // 12h mode
+	{
+		if(hours>12) 
+		{
+			hours/=2;
+			new_val |= _BV(5); // set PM
+		}
+		VAL_TO_DS1307(hours);
+		hours |= new_val;
+	}
+	else
+	{
+		VAL_TO_DS1307(hours);
+	}
+
+	if( date > 31 || !date) return 4;
+	VAL_TO_DS1307(date);
+
+	if( month > 12 || !month ) return 5;
+	VAL_TO_DS1307(month);
+
+	if( year > 99 ) return 6;
+	VAL_TO_DS1307(year);
+
+
+	twi_start();
+	twi_write_addr(TWIADDR_DS1307);
+	twi_write_data(0);
+	twi_write_data(seconds);
+	twi_write_data(minutes);
+	twi_write_data(hours);
+	twi_write_data(1); // day
+	twi_write_data(date);
+	twi_write_data(month);
+	twi_write_data(year);
+	twi_stop();
+
+	return 0;
+}
+
+void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, uint8_t *hours, 
+			uint8_t *day, uint8_t *date, uint8_t *month, uint8_t *year)
+{
+	twi_start();
+	twi_write_addr(TWIADDR_DS1307);
+	twi_write_data(0);
+	twi_start();
+	twi_read_addr(TWIADDR_DS1307);
+	twi_read_data(seconds,false);
+	twi_read_data(minutes,false);
+	twi_read_data(hours,false);
+	twi_read_data(day,false);
+	twi_read_data(date,false);
+	twi_read_data(month,false);
+	twi_read_data(year,true);
+	twi_stop();
+
+	*seconds &= 0x7F;
+	DS1307_TO_VAL( (*seconds) );
+	DS1307_TO_VAL( (*minutes) );
+	*is12h=(bool)( *hours & 0x40 );
+	if( is12h ) *hours = (*hours & 0x1F) + (*hours&0x20?12:0);
+	else *hours = (*hours & 0x1F);
+	DS1307_TO_VAL( (*hours) );
+	DS1307_TO_VAL( (*day) );
+	DS1307_TO_VAL( (*date) );
+	DS1307_TO_VAL( (*month) );
+	DS1307_TO_VAL( (*year) );
 }

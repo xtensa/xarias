@@ -30,4 +30,8 @@ void inline twi_start();
 void inline twi_stop();
 
 void ds1803_write(uint8_t pot, uint8_t val);
+uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, uint8_t hours, uint8_t date, uint8_t month, uint8_t year);
+void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, uint8_t *hours, 
+			uint8_t *day, uint8_t *date, uint8_t *month, uint8_t *year);
+
 
