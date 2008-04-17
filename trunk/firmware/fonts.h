@@ -2,6 +2,7 @@
 #define XARIAS_FONTS
 
 #include "../utils/font5x7/font5x7.h"
+#include "../utils/font16x24/font16x24.h"
 
 /*
  * Font 5x7 mapping table
@@ -114,6 +115,29 @@ void init_font5x7()
 	font5x7['']=PIC_;
 	font5x7['']=PIC_;
 */	
+}
+
+
+/*
+ * Font 16x24 apping table
+ */
+const prog_uint8_t *font16x24[64] = {NULL};
+
+void init_font16x24()
+{
+	font16x24[' ']=PIC_fb_space;
+	font16x24['.']=PIC_fb_dot;
+	font16x24[':']=PIC_fb_colon;
+	font16x24['0']=PIC_fb_0;
+	font16x24['1']=PIC_fb_1;
+	font16x24['2']=PIC_fb_2;
+	font16x24['3']=PIC_fb_3;
+	font16x24['4']=PIC_fb_4;
+	font16x24['5']=PIC_fb_5;
+	font16x24['6']=PIC_fb_6;
+	font16x24['7']=PIC_fb_7;
+	font16x24['8']=PIC_fb_8;
+	font16x24['9']=PIC_fb_9;
 }
 
 #endif /* XARIAS_FONTS */

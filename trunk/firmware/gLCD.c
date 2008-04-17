@@ -35,7 +35,8 @@
 
 uint8_t gLCD_x, gLCD_y;
 
-FILE gLCD_str = FDEV_SETUP_STREAM(gLCD_putchar, NULL, _FDEV_SETUP_WRITE);
+FILE gLCD_str5x7   = FDEV_SETUP_STREAM(gLCD_putchar_5x7,   NULL, _FDEV_SETUP_WRITE);
+FILE gLCD_str16x24 = FDEV_SETUP_STREAM(gLCD_putchar_16x24, NULL, _FDEV_SETUP_WRITE);
 
 
 void gLCD_init()
@@ -67,8 +68,9 @@ void gLCD_init()
 	gLCD_cls();
 	//gLCD_cls();
 
-	stdout = &gLCD_str;
+	stdout = &gLCD_str5x7;
 	init_font5x7();
+	init_font16x24();
 }
 
 
@@ -378,28 +380,26 @@ void gLCD_rwtest()
 
 #define gLCD_locate(x,y) {gLCD_x=x;gLCD_y=y;}
 
-int gLCD_putchar(char c, FILE *unused)
+int gLCD_putchar(char c, const uint8_t **font, uint8_t width, uint8_t height, uint8_t space)
 {
 	uint8_t zero=0;
-	gLCD_draw_img_progmem(gLCD_x,gLCD_y,font5x7[(uint8_t)c],5,7);
-	gLCD_draw_img(gLCD_x+5,gLCD_y,&zero,1,7);
+	gLCD_draw_img_progmem(gLCD_x,gLCD_y,font[(uint8_t)c],width,height);
+	if(space) gLCD_draw_img(gLCD_x+width,gLCD_y,&zero,space,height);
 
-	gLCD_x+=6;
+	gLCD_x+=width+space;
 	return 0;	
 }
 
-
-void gLCD_echo(uint8_t x, uint8_t y, char *str)
+int gLCD_putchar_5x7(char c, FILE *unused)
 {
-	uint8_t i, zero=0;
-	for(i=0;str[i];i++)
-	{
-		gLCD_draw_img_progmem(i*6+x,y,font5x7[(uint8_t)str[i]],5,7);
-		/* if it is not last symbol, than draw space */
-		if(str[i+1]) 
-			gLCD_draw_img(i*6+5+x,y,&zero,1,7);
-	}
+	return gLCD_putchar(c,font5x7,5,7,1);	
 }
+
+int gLCD_putchar_16x24(char c, FILE *unused)
+{
+	return gLCD_putchar(c,font16x24,16,24,0);	
+}
+
 
 void gLCD_alert(char *str)
 {
@@ -411,7 +411,8 @@ void gLCD_alert(char *str)
 		gLCD_frame(63-i,31-j,64+i,33+j,1,true);
 	}
 
-	gLCD_echo(x,y,str);
+	gLCD_locate(x,y)
+	fprintf(stdout,"%s",str);
 }
 
 

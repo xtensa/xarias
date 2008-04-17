@@ -50,6 +50,9 @@
 extern uint8_t gLCD_x, gLCD_y;
 #define gLCD_locate(x,y) {gLCD_x=x;gLCD_y=y;}
 
+extern FILE gLCD_str5x7; 
+extern FILE gLCD_str16x24; 
+
 
 void gLCD_init();
 void gLCD_cls();
@@ -81,8 +84,8 @@ void gLCD_line(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, bool onoff);
 void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width, bool onoff);
 
 
-int  gLCD_putchar(char c, FILE *unused);
-void gLCD_echo(uint8_t x, uint8_t y, char *str);
+int  gLCD_putchar_5x7(char c, FILE *unused);
+int  gLCD_putchar_16x24(char c, FILE *unused);
 void gLCD_alert(char *str);
 
 #endif

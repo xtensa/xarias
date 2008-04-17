@@ -25,6 +25,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
@@ -65,15 +66,17 @@
 #define MODE_DATETIME_SETTINGS	0x02
 #define MODE_SCREEN_ADJUST	0x03
 #define MODE_SERVICE		0x04
-#define MODE_MAIN		0x05
+#define MODE_TRIP		0x05
 #define MODE_MENU		0x06
+#define MODE_FUEL		0x07
+#define MODE_SPEED		0x08
 
 
 
 /*
  * Main menu variables.
  */
-uint8_t mainmenu_pos=0;
+uint8_t mainmenu_pos=0, func_pos=0, MODE_MAIN=MODE_SPEED;
 #define MAIN_MENU_COUNT 6
 char mainmenu_strings[6][19]={	"Trip settings",
 				"AirCon settings",
@@ -81,6 +84,10 @@ char mainmenu_strings[6][19]={	"Trip settings",
 				"Screen adjustment",
 				"Service mode",
 				"Exit"};
+
+
+
+uint8_t contrast=104, brightness=80;
 
 
 /*
@@ -115,6 +122,9 @@ uint8_t kb_state[12]={0};
 
 #define KB_ESC		KB_FUNC7
 
+
+void draw_frame01();
+
 /*
  * The following variable is used to store current working mode
  */
@@ -128,16 +138,24 @@ void inline set_mode(uint8_t mode)
 	modestate=mode;
 	aflags|=_BV(FLAG_MODE_CHANGED)|_BV(FLAG_LCD_UPDATE);
 	gLCD_cls();
+	if(mode==MODE_SPEED || mode==MODE_TRIP || mode==MODE_FUEL)
+	{
+		MODE_MAIN=mode;
+		draw_frame01();
+	}
 }
 
 
 /*
  * All variables for calculating speed, rpm, fuel consumption, etc.
  */
-uint16_t tcnt0_overs_sec=0, speed_ticks=0;
+uint16_t tcnt0_overs_sec=0, speed_ticks=0, fuel_cost=420;
 uint64_t passed_inj_ticks=0;
-uint32_t passed_seconds=0, tcnt0_overs=0, passed_speed_ticks=0;
+uint32_t passed_seconds=0, tcnt0_overs=0, passed_speed_ticks=0, tot_fuel=0, tot_cost=0;
 volatile uint16_t last_inj_ticks=0, rpm_ticks=0, clock_ticks=0;
+bool is12h;
+uint8_t seconds, minutes, hours, day, date, month, year;
+char *pmstr="  ";
 ///////////////////////////////
 
 
@@ -165,6 +183,7 @@ void error_(char *msg, uint8_t data)
  */
 static void xarias_init(void)
 {
+	uint8_t byteA, byteB, byteC;
 	/*
 	 * Setting up TWI bus.
 	 */
@@ -176,34 +195,76 @@ static void xarias_init(void)
 	 */
 	twi_write_addr(TWIADDR_DS1307);
 
-	/*
-	 * writing address start 0
-	 */
-	twi_write_data(0);
-
-	/*
-	 * Writing time registers
-	 * Important to enable CH bit in register 0
-	 */
-	twi_write_data(51); 
-	twi_write_data(1);
-	twi_write_data(1);
-	twi_write_data(1);
-	twi_write_data(1);
-	twi_write_data(1);
-	twi_write_data(1);
-
-	/*
-	 * writing control register
-	 * setting 32,768 kHz (bits 0 and 1)
-	 */
-	twi_write_data(_BV(4)|_BV(0)|_BV(1));
-
 	
 	/*
-	 * Stopping TWI communication
+	 * First we should check if ds1307 memory was erased.
+	 * Writing address start 08h - the beginning of data memory.
+	 * The check is simple: sum of two first bytes should give us third byte
 	 */
-	twi_stop();
+	twi_write_data(0x08);
+	twi_start(); // repeated start
+	twi_read_addr(TWIADDR_DS1307);
+	twi_read_data(&byteA,false);
+	twi_read_data(&byteB,false);
+	twi_read_data(&byteC,true);
+	if((uint8_t)(byteA+byteB)!=byteC || (!byteA && !byteB) )
+	{
+		/*
+		 * First turn on LCD
+		 */
+		ds1803_write(0, contrast);
+		ds1803_write(1, brightness);
+
+		/*
+		 * If condition is not met than we should initialize clock and additional bytes
+		 */
+		twi_start();
+		twi_write_addr(TWIADDR_DS1307);
+		twi_write_data(0x00);
+
+		/*
+		 * Writing time registers
+		 * Important to enable CH bit in register 0
+		 */
+		twi_write_data(51); 
+		twi_write_data(1);
+		twi_write_data(1);
+		twi_write_data(1);
+		twi_write_data(1);
+		twi_write_data(1);
+		twi_write_data(1);
+	
+		/*
+		 * writing control register
+		 * setting 32,768 kHz (bits 0 and 1)
+		 */
+		twi_write_data(_BV(4)|_BV(0)|_BV(1));
+
+		srandom(byteA+byteB+byteC);
+		do{
+			byteA=(uint8_t)random();
+		}while(!byteA);
+		do{
+			byteB=(uint8_t)random();
+		}while(!byteB);
+		byteC=byteA+byteB;
+		twi_write_data(byteA);
+		twi_write_data(byteB);
+		twi_write_data(byteC);
+		twi_write_data(contrast);
+		twi_write_data(brightness);
+		twi_stop();
+	}	
+	else 
+	{
+		twi_start();
+		twi_read_addr(TWIADDR_DS1307);
+		twi_read_data(&contrast,false);
+		twi_read_data(&brightness,true);
+		ds1803_write(0,contrast);
+		ds1803_write(1,brightness);
+
+	}
 
 	_delay_us(10);
 
@@ -292,6 +353,11 @@ uint16_t calc_fuel_100(uint16_t l_fuel_h, uint64_t l_speed_ticks, uint32_t l_sec
 	return (uint16_t)(((uint64_t)l_fuel_h*SPEED_TICKS*l_seconds)/(l_speed_ticks*36));
 }
 
+uint32_t calc_fuel_total(uint64_t l_inj_ticks)
+{
+	return (uint32_t)((l_inj_ticks*INJ_FLOW*15)/7372800UL);
+}
+
 uint16_t calc_speed_m(uint64_t l_speed_ticks, uint32_t l_seconds)
 {
 	return (uint16_t)(l_speed_ticks*1000/(SPEED_TICKS*l_seconds));
@@ -374,10 +440,80 @@ uint8_t inline kb_column_getstate(uint8_t col)
 	return 0;
 }
 
+uint8_t get_days_in_month(uint8_t year, uint8_t month)
+{
+	if(month==4 || month==6 || month==9 || month==11)
+	{
+		return 30;
+	}
+	else if(month==2)
+	{
+		return 28+(int)(!(year%4));
+	}
+
+	return 31;
+}
+
+void draw_frame01()
+{
+	gLCD_frame(0,0,127,63,1,true);
+	gLCD_line(89,0,89,63,true);
+	gLCD_line(0,45,89,45,true);
+	gLCD_line(44,46,44,63,true);
+}
+
+
+void draw_acinfo()
+{
+	/*
+	 * A/C part
+	 */
+	gLCD_locate(103,2)
+	fprintf(stdout,"A/C");
+	gLCD_locate(91,10);
+	fprintf(stdout,"Manual");
+	gLCD_locate(103,18)
+	fprintf(stdout,"OFF");
+	gLCD_line(89,27,127,27,true);
+	/*
+	 * Inside/Outside temperature
+	 */
+	gLCD_locate(103,29);
+	fprintf(stdout,"In");
+	gLCD_locate(91,37);
+	fprintf(stdout,"%3u^%c",19,'C');
+	gLCD_line(89,45,127,45,true);
+	gLCD_locate(103,47);
+	fprintf(stdout,"Out");
+	gLCD_locate(91,55);
+	fprintf(stdout,"%3u^%c",23,'C');
+}
+
+void draw_clock()
+{
+	ds1307_read_time(&seconds, &minutes, &is12h, pmstr, &hours, &day, &date, &month, &year);
+	gLCD_locate(46,47);
+	fprintf(stdout,"%s%2u:%02u",pmstr,hours,minutes);
+	gLCD_locate(58,55);
+	fprintf(stdout,"%02u/%02u",date,month);
+}
+
+void switch_pmstr()
+{
+	if(pmstr[0]=='A') pmstr[0]='P';
+	else pmstr[0]='A';
+}
+
 int main()
 {
-	uint8_t i,j,k=104, l=80;
+	uint8_t i,j;
 	uint8_t pin;
+
+	uint8_t kb_sth_pressed;
+	uint16_t m_speed_m, m_speed_km, avg_speed_m, avg_speed_km;
+	uint16_t m_fuel_h, m_fuel_100, avg_fuel_h, avg_fuel_100;
+	uint32_t passed_distance;
+	
 
 
 	/*
@@ -387,12 +523,10 @@ int main()
 
 	gLCD_init();
 	xarias_init();
-					ds1803_write(0,k);
-					ds1803_write(1,l);
-	
+
 	while(1)
 	{
-		uint8_t kb_sth_pressed=0;
+		kb_sth_pressed=0;
 		/*
 		 * Keyboard routine
 		 */
@@ -426,36 +560,52 @@ int main()
 
 		if(!kb_sth_pressed) AFLAGS_UNSET(FLAG_MODE_CHANGED);
 		
+		#define REPEAT_STROKES 50
 		/*
 		 * key processing logics
 		 */
 		switch(modestate)
 		{
-			case MODE_MAIN:
+			case MODE_TRIP:
+			case MODE_FUEL:
+			case MODE_SPEED:
 			{
 				if(KB_OK) 
 				{ 
-					set_mode(MODE_MENU); 
+					set_mode(MODE_MENU);
+				}
+
+				if(KB_FUNC1==1)
+				{
+					set_mode(MODE_SPEED);
+				}
+				if(KB_FUNC2==1)
+				{
+					set_mode(MODE_FUEL);
+				}
+				if(KB_FUNC3==1)
+				{
+					set_mode(MODE_TRIP);
 				}
 			} break;
 
 			case MODE_MENU:
 			{
-				if(KB_DOWN==1 || KB_DOWN==50) 
+				if(KB_DOWN==1 || KB_DOWN==REPEAT_STROKES) 
 				{ 
 					mainmenu_pos++;
 					mainmenu_pos%=MAIN_MENU_COUNT;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
-					if(KB_DOWN==50) KB_DOWN=49;
+					if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-1;
 				}
-				if(KB_UP==1 || KB_UP==50) 
+				if(KB_UP==1 || KB_UP==REPEAT_STROKES) 
 				{ 
 					if(mainmenu_pos)
 						mainmenu_pos--;
 					else
 						mainmenu_pos=MAIN_MENU_COUNT-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
-					if(KB_UP==50) KB_UP=49;
+					if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-1;
 				}
 				if(KB_OK)
 				{
@@ -474,34 +624,41 @@ int main()
 			{
 				if(KB_ESC) 
 				{
+					twi_start();
+					twi_write_addr(TWIADDR_DS1307);
+					twi_write_data(11);
+					twi_write_data(contrast);
+					twi_write_data(brightness);
+					twi_stop();
+
 					set_mode(MODE_MENU);
 				}
 
-				if(KB_LEFT==1 || KB_LEFT==50)
+				if(KB_LEFT==1 || KB_LEFT==REPEAT_STROKES)
 				{
-					if(k>SCREEN_CONTRAST_MIN) k--;
-					if(KB_LEFT==50) KB_LEFT=49;
+					if(contrast>SCREEN_CONTRAST_MIN) contrast--;
+					if(KB_LEFT==REPEAT_STROKES) KB_LEFT=REPEAT_STROKES-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
 				}
 	
-				if(KB_RIGHT==1 || KB_RIGHT==50)
+				if(KB_RIGHT==1 || KB_RIGHT==REPEAT_STROKES)
 				{
-					if(k<SCREEN_CONTRAST_MAX) k++;
-					if(KB_RIGHT==50) KB_RIGHT=49;
+					if(contrast<SCREEN_CONTRAST_MAX) contrast++;
+					if(KB_RIGHT==REPEAT_STROKES) KB_RIGHT=REPEAT_STROKES-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
 				}
 	
-				if(KB_DOWN==1 || KB_DOWN==50)
+				if(KB_DOWN==1 || KB_DOWN==REPEAT_STROKES)
 				{
-					if(l>SCREEN_BRIGHTNESS_MIN) l--;
-					if(KB_DOWN==50) KB_DOWN=49;
+					if(brightness>SCREEN_BRIGHTNESS_MIN) brightness--;
+					if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
 				}
 	
-				if(KB_UP==1 || KB_UP==50)
+				if(KB_UP==1 || KB_UP==REPEAT_STROKES)
 				{
-					if(l<SCREEN_BRIGHTNESS_MAX) l++;
-					if(KB_UP==50) KB_UP=49;
+					if(brightness<SCREEN_BRIGHTNESS_MAX) brightness++;
+					if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
 				}
 			} break;
@@ -528,6 +685,101 @@ int main()
 				{
 					set_mode(MODE_MENU);
 				}
+
+				if(KB_RIGHT==1)
+				{
+					func_pos++;
+					AFLAGS_SET(FLAG_LCD_UPDATE);
+				}
+
+				if(KB_LEFT==1)
+				{
+					func_pos--;
+					AFLAGS_SET(FLAG_LCD_UPDATE);
+				}
+
+				if(func_pos==255) func_pos=6;
+				func_pos%=7;
+
+				if( ((KB_UP==1 || KB_UP==REPEAT_STROKES) && !KB_DOWN) ||
+				    ((KB_DOWN==1 || KB_DOWN==REPEAT_STROKES) && !KB_UP) )
+				{
+					int8_t inc, days_in_month;
+					if(KB_UP==1 || KB_UP==REPEAT_STROKES) inc=1; else inc=-1;
+					if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-1;
+					if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-1;
+					ds1307_read_time(&seconds, &minutes, &is12h, pmstr, &hours, &day, &date, &month, &year);
+
+
+					switch(func_pos)
+					{
+						case 0: // date
+							date += inc;
+							days_in_month=get_days_in_month(year,month);
+							if(date>days_in_month) date=1;
+							if(!date) date=days_in_month;
+						break;
+						case 1: // month
+							month += inc;
+							if(month==13) month=1;
+							if(!month) month=12;
+							days_in_month=get_days_in_month(year,month);
+							if(date>days_in_month) date=days_in_month;
+						break;
+						case 2: // year
+							year += inc;
+							if(year==100) year=0;
+							if(year==255) year=99;
+							days_in_month=get_days_in_month(year,month);
+							if(date>days_in_month) date=days_in_month;
+						break;
+						case 3: // hours
+							hours += inc;
+							if(is12h)
+							{
+								if(hours==12 || (hours==11 && inc<0)) switch_pmstr();
+								if(hours==13) hours=1;
+								if(!hours) hours=12;
+							}
+							else
+							{
+								if(hours==24) hours=0;
+								if(hours==255) hours=23;
+							}
+
+
+						break;
+						case 4: // minutes
+							minutes += inc;
+							if(minutes==60) minutes=0;
+							if(minutes==255) minutes=59;
+						break;
+						case 5: // seconds
+							seconds += inc;
+							if(seconds==60) seconds=0;
+							if(seconds==255) seconds=59;
+						break;
+						case 6: // is12h
+							is12h = !is12h;
+							if(is12h)
+							{
+								pmstr[0]='A';
+								pmstr[1]='M';
+								if(hours>12) { hours-=12; pmstr[0]='P'; }
+								if(hours==12) { pmstr[0]='P'; }
+								if(!hours) { hours=12; }
+							}
+							else
+							{
+								if(pmstr[0]=='A' && hours==12) hours=0;
+								if(pmstr[0]=='P' && hours<12) hours+=12;
+							}
+						break;
+					}
+					ds1307_write_time(seconds, minutes, is12h, pmstr, hours, date, month, year);
+					AFLAGS_SET(FLAG_LCD_UPDATE);
+				}
+
 			} break;
 
 			case MODE_SERVICE:
@@ -549,6 +801,24 @@ int main()
 		{
 			AFLAGS_UNSET(FLAG_LCD_UPDATE); 
 
+			if(modestate==MODE_MAIN)
+			{
+				passed_distance=passed_speed_ticks*1000/SPEED_TICKS;
+	
+				m_fuel_h     = calc_fuel_h(last_inj_ticks,1);
+				m_fuel_100   = calc_fuel_100(m_fuel_h,speed_ticks,1);
+				avg_fuel_h   = calc_fuel_h(passed_inj_ticks,passed_seconds);
+				avg_fuel_100 = calc_fuel_100(avg_fuel_h,passed_speed_ticks,passed_seconds);
+		
+				m_speed_m    = calc_speed_m(speed_ticks,1);
+				m_speed_km   = m_speed_m * 36 / 10;
+				avg_speed_m  = calc_speed_m(passed_speed_ticks,passed_seconds);
+				avg_speed_km = avg_speed_m * 36 / 10;
+				tot_fuel     = calc_fuel_total(passed_inj_ticks);
+				tot_cost     = tot_fuel*fuel_cost/1000;
+			}
+
+
 			switch(modestate)
 			{
 				case MODE_MENU:
@@ -567,33 +837,235 @@ int main()
 					gLCD_frame(2,mainmenu_pos*10+2,125,mainmenu_pos*10+12,1,true);
 				} break;
 			
-				case MODE_MAIN:
+				case MODE_SPEED:
 				{
-					uint16_t m_speed_m, m_speed_km, avg_speed_m, avg_speed_km;
-					uint16_t m_fuel_h, m_fuel_100, avg_fuel_h, avg_fuel_100;
-					uint32_t passed_distance;
-	
-					uint8_t seconds;
-					uint8_t minutes;
-					bool is12h;
-					uint8_t hours;
-					uint8_t day;
-					uint8_t date;
-					uint8_t month;
-					uint8_t year;
+					gLCD_locate(2,2);
+					fprintf(&gLCD_str5x7,"SPEED");
 
-					passed_distance=passed_speed_ticks*1000/SPEED_TICKS;
-		
-		
-					m_fuel_h     = calc_fuel_h(last_inj_ticks,1);
-					m_fuel_100   = calc_fuel_100(m_fuel_h,speed_ticks,1);
-					avg_fuel_h   = calc_fuel_h(passed_inj_ticks,passed_seconds);
-					avg_fuel_100 = calc_fuel_100(avg_fuel_h,passed_speed_ticks,passed_seconds);
+					/*
+					 * MAIN for this mode - current speed
+					 */
+					gLCD_locate(15,11);
+					fprintf(&gLCD_str16x24,"%3u",m_speed_km);
+					gLCD_locate(65,28);
+					fprintf(stdout,"km/h");
+
+					/*
+					 * Speed in m/s
+					 */
+					gLCD_locate(47,2);
+					fprintf(stdout,"%3u m/s",m_speed_m);
+
+					/*
+					 * Passed distance
+					 */
+					gLCD_locate(2,37);
+					fprintf(stdout,"km: %6u.%03u",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
+
+					/*
+					 * Average speed
+					 */
+					gLCD_locate(2,47);
+					fprintf(stdout,"Avg SPD");
+					gLCD_locate(14,55);
+					fprintf(stdout,"%3u",avg_speed_km);
+
+					draw_clock();
+					draw_acinfo();
+
+				} break;
+
+				case MODE_TRIP:
+				{
+					gLCD_locate(2,2);
+					fprintf(&gLCD_str5x7,"TRIP");
+
+					/*
+					 * MAIN for this mode - passed km
+					 */
+					if(passed_distance>9999999UL)
+					{
+						gLCD_locate(2,11);
+						fprintf(&gLCD_str16x24,"%5u",ROUND1(passed_distance,3,3));
+					}
+					else
+					{
+						gLCD_locate(12,11);
+						fprintf(&gLCD_str16x24,"%4u",ROUND1(passed_distance,3,3));
+						gLCD_locate(77,28);
+						fprintf(stdout,"km");
+					}
+
+					/*
+					 * Passed meters
+					 */
+					gLCD_locate(59,2);
+					fprintf(stdout,"%3u m",ROUND2(passed_distance,3,3));
+
+					/*
+					 * Trip time
+					 */
+					gLCD_locate(2,37);
+					fprintf(stdout,"%4ud %02u:%02u:%02u",	(uint16_t)(passed_seconds/86400),
+										(uint8_t)(passed_seconds/3600),
+										(uint8_t)((passed_seconds%3600)/60),
+										(uint8_t)(passed_seconds%60));
+
+					/*
+					 * Trip fuel
+					 */
+					gLCD_locate(2,47);
+					fprintf(stdout,"TotFuel");
+					gLCD_locate(2,55);
+					fprintf(stdout,"%5u.%u",ROUND1(tot_fuel,3,1), ROUND2(tot_fuel,3,1));
+
+					/*
+					 * Trip fuel cost
+					 */
+					gLCD_locate(46,47);
+					fprintf(stdout,"Cost%s","PLN");
+					gLCD_locate(46,55);
+					fprintf(stdout,"%4u.%02u",ROUND1(tot_cost,2,2), ROUND2(tot_cost,2,2));
+
+					draw_acinfo();
+
+				
+				} break;
+
+				case MODE_FUEL:
+				{
+					gLCD_locate(2,2);
+					fprintf(&gLCD_str5x7,"FUEL");
+
+					/*
+					 * MAIN for this mode - current fueal consumption
+					 */
+					gLCD_locate(18,11);
+					fprintf(&gLCD_str16x24,"%2u.%u",ROUND1(m_fuel_100,3,1),ROUND2(m_fuel_100,3,1));
+					gLCD_locate(42,37);
+					fprintf(stdout,"l/100km");
+
+					/*
+					 * Fuel consumption in l/h
+					 */
+					gLCD_locate(41,2);
+					fprintf(stdout,"%2u.%u l/h",ROUND1(m_fuel_h,3,1),ROUND2(m_fuel_h,3,1));
+
+					/*
+					 * Trip time
+					 *
+					gLCD_locate(2,37);
+					fprintf(stdout,"%4ud %02u:%02u:%02u",	(uint16_t)(passed_seconds/86400),
+										(uint8_t)(passed_seconds/3600),
+										(uint8_t)((passed_seconds%3600)/60),
+										(uint8_t)(passed_seconds%60));
+					*/
+					/*
+					 * Average fuel consumption
+					 */
+					gLCD_locate(2,47);
+					fprintf(stdout,"AvgFuel");
+					gLCD_locate(2,55);
+					fprintf(stdout,"%5u.%u",ROUND1(avg_fuel_100,3,1), ROUND2(avg_fuel_100,3,1));
+
+					/*
+					 * Trip fuel cost
+					 *
+					gLCD_locate(46,47);
+					fprintf(stdout,"Cost%s","PLN");
+					gLCD_locate(46,55);
+					fprintf(stdout,"%4u.%02u",ROUND1(tot_cost,2,2), ROUND2(tot_cost,2,2));
+*/
+					draw_clock();
+					draw_acinfo();
+				} break;
+
+
+				case MODE_SCREEN_ADJUST:
+				{
+					uint8_t scr_tmp;
+
+					gLCD_frame(0,0,127,63,1,true);
+					gLCD_locate(14,3);
+					fprintf(stdout,"SCREEN ADJUSTMENT");
+
+					scr_tmp=((uint16_t)contrast-SCREEN_CONTRAST_MIN)*100/(SCREEN_CONTRAST_MAX-SCREEN_CONTRAST_MIN);
+					gLCD_locate(5,18);
+					fprintf(stdout,"Contrast LEFT/RIGHT");
+					if_draw_progressbar(3,27,99,34,scr_tmp);
+					gLCD_locate(102,27);
+					fprintf(stdout,"%3u%%",scr_tmp);
+
+					scr_tmp=((uint16_t)brightness-SCREEN_BRIGHTNESS_MIN)*100/(SCREEN_BRIGHTNESS_MAX-SCREEN_BRIGHTNESS_MIN);
+					gLCD_locate(5,40);
+					fprintf(stdout,"Brightness UP/DOWN");
+					if_draw_progressbar(3,49,99,56,scr_tmp);
+					gLCD_locate(102,49);
+					fprintf(stdout,"%3u%%",scr_tmp);
+
+					ds1803_write(0,contrast);
+					ds1803_write(1,brightness);
+				} break;
 			
-					m_speed_m    = calc_speed_m(speed_ticks,1);
-					m_speed_km   = m_speed_m * 36 / 10;
-					avg_speed_m  = calc_speed_m(passed_speed_ticks,passed_seconds);
-					avg_speed_km = avg_speed_m * 36 / 10;
+				case MODE_TRIP_SETTINGS:
+				{
+					gLCD_locate(2,2);
+					fprintf(stdout,"Trip settings mode");
+				} break;
+
+				case MODE_AIRCON_SETTINGS:
+				{
+					gLCD_locate(2,2);
+					fprintf(stdout,"AirCon settings mode");
+				} break;
+
+				case MODE_DATETIME_SETTINGS:
+				{
+					uint8_t xtab[]={14,56,98,14,56,98,44,69};
+					uint8_t ytab[]={21,21,21,41,41,41,51,51};
+					
+
+					gLCD_frame(0,0,127,63,1,true);
+					gLCD_locate(30,3);
+ 					fprintf(stdout,"DATE & TIME");
+					
+					ds1307_read_time(&seconds, &minutes, &is12h, pmstr, &hours, &day, &date, &month, &year);
+					gLCD_locate(10,13);
+					fprintf(stdout,"Date  Month   Year");
+					
+					gLCD_locate(16,23);
+					fprintf(stdout,"%02u", date);
+					
+					gLCD_locate(58,23);
+					fprintf(stdout,"%02u", month);
+					
+					gLCD_locate(100,23);
+					fprintf(stdout,"%02u", year);
+
+					gLCD_locate(2,33);
+					fprintf(stdout,"Hours Minutes Seconds");
+
+					gLCD_locate(16,43);
+ 					fprintf(stdout,"%02u", hours);
+					gLCD_locate(30,43);
+					fprintf(stdout,"%s", pmstr);
+					
+					gLCD_locate(58,43);
+					fprintf(stdout,"%02u", minutes);
+					
+					gLCD_locate(100,43);
+					fprintf(stdout,"%02u", seconds);
+
+					gLCD_locate(10,53);
+					fprintf(stdout,"Mode: %u h",(is12h?12:24));
+
+					for(i=0;i<7;i++) if(func_pos!=i) gLCD_frame(xtab[i],ytab[i],xtab[i]+14,ytab[i]+10,1,false);
+					gLCD_frame(xtab[func_pos],ytab[func_pos],xtab[func_pos]+14,ytab[func_pos]+10,1,true);
+
+				} break;
+
+				case MODE_SERVICE:
+				{
 		/*
 					gLCD_locate(0,40);
 					fprintf(stdout,"Inject  Speed   RPM");
@@ -626,65 +1098,13 @@ int main()
 					fprintf(stdout, "%4u.%03u km",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
 
 
-					ds1307_read_time(&seconds, &minutes, &is12h, &hours, &day, &date, &month, &year);
+					ds1307_read_time(&seconds, &minutes, &is12h, pmstr, &hours, &day, &date, &month, &year);
 					gLCD_locate(0,33);
 					fprintf(stdout,"%02u-%02u-%02u  %u", date, month, year, day);
 					gLCD_locate(0,42);
-					fprintf(stdout,"%02u:%02u:%02u  %u", hours, minutes, seconds, (uint8_t)is12h );
+					fprintf(stdout,"%02u%s:%02u:%02u  %u", hours, (is12h?pmstr:""),minutes, seconds, (uint8_t)is12h );
  
-
-				
-				} break;
-
-
-				case MODE_SCREEN_ADJUST:
-				{
-					uint8_t scr_tmp;
-
-					gLCD_frame(0,0,127,63,1,true);
-					gLCD_locate(14,3);
-					fprintf(stdout,"SCREEN ADJUSTMENT");
-
-					scr_tmp=((uint16_t)k-SCREEN_CONTRAST_MIN)*100/(SCREEN_CONTRAST_MAX-SCREEN_CONTRAST_MIN);
-					gLCD_locate(5,18);
-					fprintf(stdout,"Contrast LEFT/RIGHT");
-					if_draw_progressbar(3,27,99,34,scr_tmp);
-					gLCD_locate(102,27);
-					fprintf(stdout,"%3u%%",scr_tmp);
-
-					scr_tmp=((uint16_t)l-SCREEN_BRIGHTNESS_MIN)*100/(SCREEN_BRIGHTNESS_MAX-SCREEN_BRIGHTNESS_MIN);
-					gLCD_locate(5,40);
-					fprintf(stdout,"Brightness UP/DOWN");
-					if_draw_progressbar(3,49,99,56,scr_tmp);
-					gLCD_locate(102,49);
-					fprintf(stdout,"%3u%%",scr_tmp);
-
-					ds1803_write(0,k);
-					ds1803_write(1,l);
-				} break;
-			
-				case MODE_TRIP_SETTINGS:
-				{
-					gLCD_locate(2,2);
-					fprintf(stdout,"Trip settings mode");
-				} break;
-
-				case MODE_AIRCON_SETTINGS:
-				{
-					gLCD_locate(2,2);
-					fprintf(stdout,"AirCon settings mode");
-				} break;
-
-				case MODE_DATETIME_SETTINGS:
-				{
-					gLCD_locate(2,2);
-					fprintf(stdout,"Datetime mode");
-				} break;
-
-				case MODE_SERVICE:
-				{
-					gLCD_locate(2,2);
-					fprintf(stdout,"Service mode");
+gLCD_locate(2,2);
 				} break;
 
 				default: error_("Display unkown mode", modestate);
@@ -725,7 +1145,7 @@ SIGNAL(SIG_INTERRUPT0)
 		passed_inj_ticks += last_inj_ticks;
 	
 
-		if(modestate==MODE_MAIN)
+		if(modestate==MODE_MAIN || modestate==MODE_DATETIME_SETTINGS)
 		{
 			AFLAGS_SET(FLAG_LCD_UPDATE);
 		}
