@@ -203,7 +203,7 @@ const uint8_t PIC_M[5] PROGMEM =
 #define PIC_xor_SIZE 	5
 const uint8_t PIC_xor[5] PROGMEM =
 		{
-			0x00, 0x02, 0x01, 0x02, 0x00
+			0x00, 0x02, 0x05, 0x02, 0x00
 		};
 
 #define PIC_N_WIDTH 	5

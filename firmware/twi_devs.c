@@ -176,10 +176,9 @@ void ds1803_write(uint8_t pot, uint8_t val)
 	_delay_us(10);
 }
 
-uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, uint8_t hours, uint8_t date, uint8_t month, uint8_t year)
-{
-	uint8_t new_val;
 
+uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, char *pmstr, uint8_t hours, uint8_t date, uint8_t month, uint8_t year)
+{
 	if(seconds>59) return 1;
 	VAL_TO_DS1307(seconds);
 	seconds &= 0x7F;
@@ -188,16 +187,12 @@ uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, uint8_t 
 	VAL_TO_DS1307(minutes);
 
 	if( hours > 23 ) return 3;
-	new_val=0;
 	if( is12h ) // 12h mode
 	{
-		if(hours>12) 
-		{
-			hours/=2;
-			new_val |= _BV(5); // set PM
-		}
 		VAL_TO_DS1307(hours);
-		hours |= new_val;
+		if(pmstr[0]=='P') 
+			hours |= _BV(5); // set PM bit
+		hours |= _BV(6); // set 12h bit
 	}
 	else
 	{
@@ -229,7 +224,9 @@ uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, uint8_t 
 	return 0;
 }
 
-void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, uint8_t *hours, 
+#include "gLCD.h"
+
+void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, char *pmstr, uint8_t *hours, 
 			uint8_t *day, uint8_t *date, uint8_t *month, uint8_t *year)
 {
 	twi_start();
@@ -246,12 +243,30 @@ void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, uint8_t
 	twi_read_data(year,true);
 	twi_stop();
 
+
 	*seconds &= 0x7F;
 	DS1307_TO_VAL( (*seconds) );
 	DS1307_TO_VAL( (*minutes) );
-	*is12h=(bool)( *hours & 0x40 );
-	if( is12h ) *hours = (*hours & 0x1F) + (*hours&0x20?12:0);
-	else *hours = (*hours & 0x1F);
+	*is12h=(bool)( *hours & _BV(6) );
+	if( *is12h ) 
+	{
+		if( *hours & _BV(5) ) 
+		{
+			pmstr[0]='P';
+		}
+		else
+		{
+			pmstr[0]='A';
+		}
+		pmstr[1]='M';
+		*hours &= 0x1F;
+	}
+	else
+	{
+		pmstr[0]=' ';
+		pmstr[1]=' ';
+		*hours &= 0x3F;
+	}
 	DS1307_TO_VAL( (*hours) );
 	DS1307_TO_VAL( (*day) );
 	DS1307_TO_VAL( (*date) );
