@@ -25,7 +25,7 @@ inst_b02: b02
 	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:xarias_b02.hex:i -v -E noreset
 
 fuses:
-	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U hfuse:w:0xC9:m -v -E noreset
+	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U hfuse:w:0xCF:m -v -E noreset
 	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U lfuse:w:0xFF:m -v -E noreset
 
 

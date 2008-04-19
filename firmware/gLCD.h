@@ -86,6 +86,5 @@ void gLCD_frame(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t width,
 
 int  gLCD_putchar_5x7(char c, FILE *unused);
 int  gLCD_putchar_16x24(char c, FILE *unused);
-void gLCD_alert(char *str);
 
 #endif

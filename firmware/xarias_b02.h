@@ -66,6 +66,18 @@
 #define B02_KB_COL3 6
 #define B02_KB_COL4 7
 
+/*
+ * Error codes
+ */
+#define ERROR_NONE 			0
+#define ERROR_UNKNOWN_MODE 		1
+#define ERROR_RPM_COUNTER_OVERFLOW	2
+#define ERROR_TWI_START_CMD		3
+#define ERROR_Mx_SLA_ACK_CMD		4
+#define ERROR_MT_DATA_ACK_CMD		5
+#define ERROR_MR_DATA_NACK_CMD		6
+#define ERROR_MR_DATA_ACK_CMD		7
+
 
 
 #endif
