@@ -24,11 +24,10 @@
 
 #include "xarias_b02.h"
 
-#define error(x) error_(x,0)
 #define VAL_TO_DS1307(x) x=(((x)/10)<<4)|((x)-(x)/10*10)
 #define DS1307_TO_VAL(x) x=((x)>>4)*10+((x)&0x0F)
 
-extern void error_(char *msg, uint8_t data);
+extern void error(uint8_t data1, uint8_t data2);
 
 /*
  * This function sets up TWI bus
@@ -43,7 +42,7 @@ void inline twi_init()
 	TWSR = 0;  // prescaller = 1
 }
 
-void inline twi_start()
+uint8_t inline twi_start()
 {
 	/*
 	 * enablibg TWI and sending START condition
@@ -54,7 +53,9 @@ void inline twi_start()
 	 * waiting for TWINT flag set
 	 */
 	while (!(TWCR & _BV(TWINT)));
-	if ( TW_STATUS != TW_START && TW_STATUS != TW_REP_START ) error("TWI START cmd");
+	if ( TW_STATUS != TW_START && TW_STATUS != TW_REP_START ) return ERROR_TWI_START_CMD;
+
+	return ERROR_NONE;
 }
 
 /*
@@ -73,11 +74,10 @@ uint8_t twi_rw_addr(uint8_t addr, uint8_t mode)
 
 	if ( TW_STATUS != (mode==TW_WRITE ? TW_MT_SLA_ACK : TW_MR_SLA_ACK) ) 
 	{
-		error("Mx_SLA_ACK cmd");
-		return 1;
+		return ERROR_Mx_SLA_ACK_CMD;
 	}
 
-	return 0;
+	return ERROR_NONE;
 }
 
 uint8_t twi_write_addr(uint8_t addr) 
@@ -106,10 +106,9 @@ uint8_t twi_write_data(uint8_t data)
 
 	if ( TW_STATUS != TW_MT_DATA_ACK) 
 	{
-		error("MT_DATA_ACK cmd");
-		return 1;
+		return ERROR_MT_DATA_ACK_CMD;
 	}
-	return 0;
+	return ERROR_NONE;
 }
 
 
@@ -125,14 +124,15 @@ uint8_t twi_read_data(uint8_t *data, bool islast)
 
 	if ( islast && TW_STATUS != TW_MR_DATA_NACK) 
 	{
-		error("MR_DATA_NACK cmd");
+		return ERROR_MR_DATA_NACK_CMD;
 	}
 	if ( !islast && TW_STATUS != TW_MR_DATA_ACK) 
 	{
-		error("MR_DATA_ACK cmd");
+		return ERROR_MR_DATA_ACK_CMD;
 	}
 	*data = TWDR;
-	return 0; 
+
+	return ERROR_NONE; 
 
 }
 

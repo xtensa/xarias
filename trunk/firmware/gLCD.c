@@ -401,18 +401,4 @@ int gLCD_putchar_16x24(char c, FILE *unused)
 }
 
 
-void gLCD_alert(char *str)
-{
-	uint8_t i,j, x=20, y=38;
-
-	for(i=0,j=0;i<=50 && j<=30;i+=25,j+=15)
-	{
-		gLCD_fill_rect(63-i,31-j,64+i,33+j,0);
-		gLCD_frame(63-i,31-j,64+i,33+j,1,true);
-	}
-
-	gLCD_locate(x,y)
-	fprintf(stdout,"%s",str);
-}
-
 
