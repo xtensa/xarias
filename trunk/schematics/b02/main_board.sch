@@ -1533,7 +1533,7 @@ device=BD238
 T 67875 44875 5 10 1 1 0 0 1
 refdes=T1
 T 67575 46075 5 10 0 0 0 0 1
-footprint=TO126
+footprint=TO126W
 }
 C 63075 43875 1 0 0 EMBEDDEDBC547-1.sym
 [
