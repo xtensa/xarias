@@ -224,7 +224,6 @@ uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, char *pm
 	return 0;
 }
 
-#include "gLCD.h"
 
 void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, char *pmstr, uint8_t *hours, 
 			uint8_t *day, uint8_t *date, uint8_t *month, uint8_t *year)

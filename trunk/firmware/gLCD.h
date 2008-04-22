@@ -46,7 +46,7 @@
 #define ABS(a)		((a)<0?(-(a)):(a))
 
 
-
+extern bool is_lcd_on;
 extern uint8_t gLCD_x, gLCD_y;
 #define gLCD_locate(x,y) {gLCD_x=x;gLCD_y=y;}
 
@@ -54,7 +54,8 @@ extern FILE gLCD_str5x7;
 extern FILE gLCD_str16x24; 
 
 
-void gLCD_init();
+void gLCD_switchon();
+void gLCD_switchoff();
 void gLCD_cls();
 
 void gLCD_draw_rect(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t ptrn, const uint8_t *img, uint8_t is_progmem);

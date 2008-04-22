@@ -19,7 +19,11 @@ OBJCOPY        = avr-objcopy
 OBJDUMP        = avr-objdump
 
 all:
-	@echo "Use either \"make b01\" or \"make b02\" ."
+	@echo "Usage: make b01      - build firmware for b01 xarias board"
+	@echo "       make b02      - build firmware for b02 xarias board"
+	@echo "       make inst_b01 - build and install b01 firmware"
+	@echo "       make inst_b02 - build and install b01 firmware"
+	@echo "       make fuses    - write fuse bits"
 
 inst_b02: b02
 	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:xarias_b02.hex:i -v -E noreset
@@ -32,8 +36,10 @@ fuses:
 b01: $(PRG)_b01.elf lst_b01 text_b01
 #all: $(PRG).elf lst text eeprom
 
-
 b02: $(PRG)_b02.elf lst_b02 text_b02
+	@echo -n "Size of the binary: "
+	@ls -l ${PRG}_b02.bin | cut -d ' ' -f 5 -
+
 
 $(PRG)_b01.elf: $(OBJ_B01)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
@@ -48,6 +54,7 @@ clean:
 lst_b01:  $(PRG)_b01.lst
 
 lst_b02:  $(PRG)_b02.lst
+
 
 %.lst: %.elf
 	$(OBJDUMP) -h -S $< > $@

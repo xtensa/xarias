@@ -85,6 +85,14 @@ char mainmenu_strings[6][19]={	"Trip settings",
 				"Service mode",
 				"Exit"};
 
+#define REPEAT_STROKES 50
+/*
+ * Keyboard Repeat Speed
+ * Lower value generates faster repeat.
+ * Allowed values: min=2 (the fastest), max=REPEAT_STROKES (the slowest).
+ */
+uint8_t kb_repeat_speed=2;
+
 
 /*
  * These variables will be saved to DS1307 rom
@@ -144,7 +152,7 @@ uint8_t modestate;
 /*
  * Use only this function to change mode. Do not change mode directly.
  */
-void inline set_mode(uint8_t mode)
+void set_mode(uint8_t mode)
 {
 	modestate=mode;
 	aflags|=FLAG_MODE_CHANGED|FLAG_LCD_UPDATE;
@@ -159,6 +167,7 @@ void inline set_mode(uint8_t mode)
 		func_pos=0;
 		subfunc_pos=0;
 	}
+	kb_repeat_speed=2;
 }
 
 
@@ -201,6 +210,8 @@ void error(uint8_t data1, uint8_t data2)
 static void xarias_init(void)
 {
 	uint8_t byteA, byteB, byteC;
+
+	gLCD_switchon();
 	/*
 	 * Setting up TWI bus.
 	 */
@@ -500,7 +511,7 @@ uint8_t get_days_in_month(uint8_t year, uint8_t month)
 	}
 	else if(month==2)
 	{
-		return 28+(int)(!(year%4));
+		return 28+(uint8_t)(!(year%4));
 	}
 
 	return 31;
@@ -512,6 +523,17 @@ void draw_frame01()
 	gLCD_line(89,0,89,63,true);
 	gLCD_line(0,45,89,45,true);
 	gLCD_line(44,46,44,63,true);
+}
+
+bool aaa(bool a)
+{
+	//if(AFLAGS_ISSET(FLAG_AC_MODE))
+	//if(is_km)
+	//	a=false;
+	
+	//AFLAGS_SET(FLAG_AC_MODE);
+//	is_km=true;
+	return a;
 }
 
 
@@ -580,9 +602,9 @@ int main()
 	int8_t inc;
 
 	uint8_t kb_sth_pressed;
-	uint16_t m_speed_m, m_speed_km, avg_speed_m, avg_speed_km;
-	uint16_t m_fuel_h, m_fuel_100, avg_fuel_h, avg_fuel_100;
-	uint32_t passed_distance;
+	uint16_t m_speed_m=0, m_speed_km=0, avg_speed_m=0, avg_speed_km=0;
+	uint16_t m_fuel_h=0, m_fuel_100=0, avg_fuel_h=0, avg_fuel_100=0;
+	uint32_t passed_distance=0;
 	uint8_t ac_pressed=0;
 	
 
@@ -592,7 +614,6 @@ int main()
 	 */
 	_delay_ms(20);
 
-	gLCD_init();
 	xarias_init();
 
 	while(1)
@@ -617,6 +638,7 @@ int main()
 					{
 						kb_state[i+j*4]++;
 						kb_sth_pressed=1;
+						if(kb_state[i+j+4]==REPEAT_STROKES+1) kb_state[i+j+1]=REPEAT_STROKES - kb_repeat_speed;
 					}
 				}
 				else
@@ -631,7 +653,6 @@ int main()
 
 		if(!kb_sth_pressed) AFLAGS_UNSET(FLAG_MODE_CHANGED);
 		
-		#define REPEAT_STROKES 50
 		/*
 		 * key processing logics
 		 */
@@ -659,11 +680,21 @@ int main()
 				{
 					set_mode(MODE_TRIP);
 				}
-				if(KB_FUNC4==1) error(3, 14);
+				if(KB_FUNC4==1) 
+				{
+					gLCD_switchon();
+					set_mode(MODE_MAIN);
+					ds1803_write(0,contrast);
+					ds1803_write(1,brightness);
+				}
+				if(KB_FUNC5==1) 
+				{
+					gLCD_switchoff();
+				}
 				
 				if(KB_FUNC6==1) ac_pressed=1;
 				
-				if(!KB_FUNC6 && ac_pressed) // switching A/C ON or OFF
+				if(!KB_FUNC6 && ac_pressed<REPEAT_STROKES) // switching A/C ON or OFF
 				{
 					if(AFLAGS_ISSET(FLAG_AC_ONOFF)) 
 					{
@@ -678,10 +709,11 @@ int main()
 					//AFLAGS_SET(FLAG_LCD_UPDATE);
 					ac_pressed=0;
 				}
-				if(KB_FUNC6==REPEAT_STROKES) ac_pressed=0;
+				if(KB_FUNC6==REPEAT_STROKES && ac_pressed) ac_pressed++;
 
-				if(KB_FUNC6==REPEAT_STROKES*2) // changing A/C mode
+				if(ac_pressed==REPEAT_STROKES) // changing A/C mode
 				{
+					ac_pressed=0;
 					if(AFLAGS_ISSET(FLAG_AC_MODE)) 
 					{
 						AFLAGS_UNSET(FLAG_AC_MODE);
@@ -710,12 +742,12 @@ int main()
 					if(temp_ac<TEMP_MAX)
 					{
 						if(KB_UP==1) inc=1;
-						if(KB_UP==REPEAT_STROKES) { inc=1; KB_UP=REPEAT_STROKES-1; }
+						if(KB_UP==REPEAT_STROKES) { inc=1; }
 					}
 					if(temp_ac>TEMP_MIN)
 					{
 						if(KB_DOWN==1) inc=-1;
-						if(KB_DOWN==REPEAT_STROKES) { inc=-1; KB_DOWN=REPEAT_STROKES-1; }
+						if(KB_DOWN==REPEAT_STROKES) { inc=-1;  }
 					}
 					if(inc)
 					{
@@ -730,8 +762,6 @@ int main()
 					}
 				}
 
-				if(KB_DOWN==255) KB_FUNC6=254;
-
 			} break;
 
 			case MODE_MENU:
@@ -741,7 +771,6 @@ int main()
 					mainmenu_pos++;
 					mainmenu_pos%=MAIN_MENU_COUNT;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
-					if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-1;
 				}
 				if(KB_UP==1 || KB_UP==REPEAT_STROKES) 
 				{ 
@@ -750,7 +779,6 @@ int main()
 					else
 						mainmenu_pos=MAIN_MENU_COUNT-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
-					if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-1;
 				}
 				if(KB_OK)
 				{
@@ -782,28 +810,24 @@ int main()
 				if(KB_LEFT==1 || KB_LEFT==REPEAT_STROKES)
 				{
 					if(contrast>SCREEN_CONTRAST_MIN) contrast--;
-					if(KB_LEFT==REPEAT_STROKES) KB_LEFT=REPEAT_STROKES-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
 				}
 	
 				if(KB_RIGHT==1 || KB_RIGHT==REPEAT_STROKES)
 				{
 					if(contrast<SCREEN_CONTRAST_MAX) contrast++;
-					if(KB_RIGHT==REPEAT_STROKES) KB_RIGHT=REPEAT_STROKES-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
 				}
 	
 				if(KB_DOWN==1 || KB_DOWN==REPEAT_STROKES)
 				{
 					if(brightness>SCREEN_BRIGHTNESS_MIN) brightness--;
-					if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
 				}
 	
 				if(KB_UP==1 || KB_UP==REPEAT_STROKES)
 				{
 					if(brightness<SCREEN_BRIGHTNESS_MAX) brightness++;
-					if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-1;
 					AFLAGS_SET(FLAG_LCD_UPDATE); 
 				}
 			} break;
@@ -828,15 +852,14 @@ int main()
 					{
 						case 0: // changing fuel cost
 						{
+							kb_repeat_speed=5;
 							if(KB_UP==1 || KB_UP==REPEAT_STROKES)
 							{
 								fuel_cost++;
-								if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-4;
 							}
 							if(KB_DOWN==1 || KB_DOWN==REPEAT_STROKES)
 							{
 								fuel_cost--;
-								if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-4;
 							}
 							gLCD_locate(68,13);
 							printf("%4u.%02u",ROUND1(fuel_cost,2,2),ROUND2(fuel_cost,2,2));
@@ -848,18 +871,17 @@ int main()
 	
 							// [space] -> '@'
 							if(currency[subfunc_pos-1]==' ') currency[subfunc_pos-1]='@';
+							kb_repeat_speed=6;
 	
 							if(KB_UP==1 || KB_UP==REPEAT_STROKES)
 							{
 								currency[subfunc_pos-1]--;
 								if(currency[subfunc_pos-1]==91) currency[subfunc_pos-1]=64;
-								if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-5;
 							}
 							if(KB_DOWN==1 || KB_DOWN==REPEAT_STROKES)
 							{
 								currency[subfunc_pos-1]++;
 								if(currency[subfunc_pos-1]==63) currency[subfunc_pos-1]=90;
-								if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-5;
 							}
 	
 							// @ -> [space] 
@@ -872,22 +894,20 @@ int main()
 						} break;
 						case 2: // changing kilometers/miles
 						{
+							kb_repeat_speed=11;
 							if(KB_UP==1 || KB_DOWN==1 || KB_UP==REPEAT_STROKES || KB_DOWN==REPEAT_STROKES)
 							{
 								is_km=!is_km;
-								if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-10;
-								if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-10;
 								gLCD_locate(68,33);
 								printf("%7s",(is_km?"km":"miles"));
 							}
 						} break;
 						case 3: // changing leters/gallons
 						{
+							kb_repeat_speed=11;
 							if(KB_UP==1 || KB_DOWN==1 || KB_UP==REPEAT_STROKES || KB_DOWN==REPEAT_STROKES)
 							{
 								is_litres=!is_litres;
-								if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-10;
-								if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-10;
 								gLCD_locate(68,43);
 								printf("%7s",(is_litres?"litres":"gallons"));
 							}
@@ -979,8 +999,6 @@ int main()
 				{
 					int8_t days_in_month;
 					if(KB_UP==1 || KB_UP==REPEAT_STROKES) inc=1; else inc=-1;
-					if(KB_UP==REPEAT_STROKES) KB_UP=REPEAT_STROKES-1;
-					if(KB_DOWN==REPEAT_STROKES) KB_DOWN=REPEAT_STROKES-1;
 					ds1307_read_time(&seconds, &minutes, &is12h, pmstr, &hours, &day, &date, &month, &year);
 
 
@@ -1070,6 +1088,7 @@ int main()
 		*/
 
 
+		//if(is_lcd_on && AFLAGS_ISSET(FLAG_LCD_UPDATE))
 		if(AFLAGS_ISSET(FLAG_LCD_UPDATE))
 		{
 			AFLAGS_UNSET(FLAG_LCD_UPDATE); 
@@ -1321,20 +1340,6 @@ int main()
 				case MODE_AIRCON_SETTINGS:
 				{
 					gLCD_locate(2,2);
-					printf("AirCon settings mode");
-					gLCD_locate(2,10);
-					printf("AirCon settings mode");
-					gLCD_locate(2,18);
-					printf("AirCon settings mode");
-					gLCD_locate(2,24);
-					printf("AirCon settings mode");
-					gLCD_locate(2,32);
-					printf("AirCon settings mode");
-					gLCD_locate(2,40);
-					printf("AirCon settings mode");
-					gLCD_locate(2,48);
-					printf("AirCon settings mode");
-					gLCD_locate(2,56);
 					printf("AirCon settings mode");
 				} break;
 
