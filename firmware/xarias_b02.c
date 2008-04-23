@@ -89,9 +89,9 @@ char mainmenu_strings[6][19]={	"Trip settings",
 /*
  * Keyboard Repeat Speed
  * Lower value generates faster repeat.
- * Allowed values: min=2 (the fastest), max=REPEAT_STROKES (the slowest).
+ * Allowed values: min=0 (the fastest), max=REPEAT_STROKES-1 (the slowest).
  */
-uint8_t kb_repeat_speed=2;
+uint8_t kb_repeat_speed=0;
 
 
 /*
@@ -102,7 +102,7 @@ uint8_t kb_repeat_speed=2;
 uint8_t contrast=104, brightness=80;
 char *currency=" EU";
 bool is_km=true, is_litres=true;
-int8_t temp_ac=17;
+uint8_t temp_ac=17;
 
 
 /*
@@ -167,7 +167,7 @@ void set_mode(uint8_t mode)
 		func_pos=0;
 		subfunc_pos=0;
 	}
-	kb_repeat_speed=2;
+	kb_repeat_speed=0;
 }
 
 
@@ -180,7 +180,7 @@ uint32_t passed_seconds=0, tcnt0_overs=0, passed_speed_ticks=0, tot_fuel=0, tot_
 volatile uint16_t last_inj_ticks=0, rpm_ticks=0, clock_ticks=0;
 bool is12h;
 uint8_t seconds, minutes, hours, day, date, month, year;
-char *pmstr="  ";
+char *pmstr="PM";
 int8_t temp_out, temp_in;
 ///////////////////////////////
 
@@ -317,9 +317,9 @@ static void xarias_init(void)
 			AFLAGS_SET(FLAG_AC_MODE);
 		else
 			AFLAGS_UNSET(FLAG_AC_MODE);
-		twi_read_data(currency,false);
-		twi_read_data(currency+1,false);
-		twi_read_data(currency+2,false);
+		twi_read_data((uint8_t *)currency,    false);
+		twi_read_data((uint8_t *)(currency+1),false);
+		twi_read_data((uint8_t *)(currency+2),false);
 		twi_read_data(&tmpdata,false);
 		fuel_cost=(uint16_t)tmpdata<<8;
 		twi_read_data(&tmpdata,false);
@@ -638,7 +638,7 @@ int main()
 					{
 						kb_state[i+j*4]++;
 						kb_sth_pressed=1;
-						if(kb_state[i+j+4]==REPEAT_STROKES+1) kb_state[i+j+1]=REPEAT_STROKES - kb_repeat_speed;
+						if(kb_state[i+j*4]==REPEAT_STROKES+1) kb_state[i+j*4]=REPEAT_STROKES - kb_repeat_speed;
 					}
 				}
 				else
@@ -694,7 +694,7 @@ int main()
 				
 				if(KB_FUNC6==1) ac_pressed=1;
 				
-				if(!KB_FUNC6 && ac_pressed<REPEAT_STROKES) // switching A/C ON or OFF
+				if(!KB_FUNC6 && ac_pressed && ac_pressed<REPEAT_STROKES) // switching A/C ON or OFF
 				{
 					if(AFLAGS_ISSET(FLAG_AC_ONOFF)) 
 					{
@@ -876,12 +876,12 @@ int main()
 							if(KB_UP==1 || KB_UP==REPEAT_STROKES)
 							{
 								currency[subfunc_pos-1]--;
-								if(currency[subfunc_pos-1]==91) currency[subfunc_pos-1]=64;
+								if(currency[subfunc_pos-1]==63) currency[subfunc_pos-1]=90;
 							}
 							if(KB_DOWN==1 || KB_DOWN==REPEAT_STROKES)
 							{
 								currency[subfunc_pos-1]++;
-								if(currency[subfunc_pos-1]==63) currency[subfunc_pos-1]=90;
+								if(currency[subfunc_pos-1]==91) currency[subfunc_pos-1]=64;
 							}
 	
 							// @ -> [space] 

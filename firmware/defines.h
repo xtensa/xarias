@@ -11,9 +11,6 @@
  * $Id: defines.h,v 1.1.2.2 2006/10/08 21:51:14 joerg_wunsch Exp $
  */
 
-/* CPU frequency */
-#define F_CPU 8000000UL
-
 /* UART baud rate */
 #define UART_BAUD  9600
 

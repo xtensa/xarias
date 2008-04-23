@@ -1,8 +1,9 @@
 PRG            = xarias
 OBJ_B01        = xarias_b01.o hd44780.o lcd.o 
-OBJ_B02        = xarias_b02.o s6b0108.o gLCD.o twi_devs.o 
+OBJ_B02        = xarias_b02.o s6b0108.o gLCD.o twi_devs.o
+OBJ_AC         = 
 MCU_TARGET     = atmega32
-OPTIMIZE       = -Os
+OPTIMIZE       = -Os -mcall-prologues
 F_CPU          = 16000000UL
 
 DEFS           =
@@ -12,48 +13,46 @@ LIBS           =
 
 CC             = avr-gcc 
 
-CFLAGS        = -g -Wall $(OPTIMIZE) -mmcu=$(MCU_TARGET) $(DEFS) -D "F_CPU=$(F_CPU)"
-LDFLAGS       = -Wl,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.16.1/ 
+CFLAGS        = -g -Wall $(OPTIMIZE) -mmcu=$(MCU_TARGET) $(DEFS) -D "F_CPU=$(F_CPU)" -ffunction-sections
+LDFLAGS       = -Wl,--gc-sections,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.18/
 
 OBJCOPY        = avr-objcopy
 OBJDUMP        = avr-objdump
 
 all:
-	@echo "Usage: make b01      - build firmware for b01 xarias board"
-	@echo "       make b02      - build firmware for b02 xarias board"
-	@echo "       make inst_b01 - build and install b01 firmware"
-	@echo "       make inst_b02 - build and install b01 firmware"
+	@echo "Usage: make XXX      - build firmware for XXX xarias board"
+	@echo "       make inst_XXX - build and install firmware for XXX board"
 	@echo "       make fuses    - write fuse bits"
+	@echo "Possible boards are b01, b02 and ac"
+	@echo "See README for more info"
 
-inst_b02: b02
-	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:xarias_b02.hex:i -v -E noreset
+
+inst_b%: b%
+	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:${PRG}_$*.hex:i -v -E noreset
 
 fuses:
 	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U hfuse:w:0xCF:m -v -E noreset
 	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U lfuse:w:0xFF:m -v -E noreset
 
 
-b01: $(PRG)_b01.elf lst_b01 text_b01
-#all: $(PRG).elf lst text eeprom
+b01: ${PRG}_b01.lst text_${PRG}_b01
 
-b02: $(PRG)_b02.elf lst_b02 text_b02
-	@echo -n "Size of the binary: "
-	@ls -l ${PRG}_b02.bin | cut -d ' ' -f 5 -
+b02: ${PRG}_b02.lst text_${PRG}_b02
 
+ac:  ${PRG}_ac.lst text_${PRG}_ac
 
-$(PRG)_b01.elf: $(OBJ_B01)
+xarias_b01.elf: ${OBJ_B01}
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-$(PRG)_b02.elf: $(OBJ_B02)
+xarias_b02.elf: ${OBJ_B02}
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+xarias_ac.elf: ${OBJ_AC}
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
-	rm -rf *.o $(PRG).elf *.eps *.png *.pdf *.bak *.bin
+	rm -rf *.o *.elf *.eps *.png *.bak *.hex
 	rm -rf *.lst *.map $(EXTRA_CLEAN_FILES)
-
-lst_b01:  $(PRG)_b01.lst
-
-lst_b02:  $(PRG)_b02.lst
 
 
 %.lst: %.elf
@@ -61,26 +60,13 @@ lst_b02:  $(PRG)_b02.lst
 
 # Rules for building the .text rom images
 
-text_b01: hex_b01 
-#text: hex bin srec
+text_%: %.elf
+	$(OBJCOPY) -j .text -j .data -O ihex $< $*.hex
+#	$(OBJCOPY) -j .text -j .data -O srec $< $*.srec
+	$(OBJCOPY) -j .text -j .data -O binary $< $*.bin
+	@echo -n "Size of the $*.bin: "
+	@ls -l $*.bin | cut -d ' ' -f 5 -
 
-text_b02: hex_b02 bin_b02
-
-hex_b01:  $(PRG)_b01.hex
-#bin:  $(PRG).bin
-#srec: $(PRG).srec
-
-hex_b02:  $(PRG)_b02.hex
-bin_b02:  $(PRG)_b02.bin
-
-%.hex: %.elf
-	$(OBJCOPY) -j .text -j .data -O ihex $< $@
-
-#%.srec: %.elf
-#	$(OBJCOPY) -j .text -j .data -O srec $< $@
-
-%.bin: %.elf
-	$(OBJCOPY) -j .text -j .data -O binary $< $@
 
 # Rules for building the .eeprom rom images
 
