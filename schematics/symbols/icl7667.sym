@@ -46,9 +46,9 @@ pintype=io
 P 1925 1300 1625 1300 1 0 0
 {
 T 1725 1350 5 8 1 1 0 0 1
-pinnumber=5
+pinnumber=6
 T 1725 1250 5 8 0 1 0 2 1
-pinseq=5
+pinseq=6
 T 1525 1250 9 8 1 1 0 6 1
 pinlabel=V +
 T 1500 1300 5 8 0 1 0 8 1
@@ -68,9 +68,9 @@ pintype=io
 P 1925 900 1625 900 1 0 0
 {
 T 1725 950 5 8 1 1 0 0 1
-pinnumber=6
+pinnumber=5
 T 1725 850 5 8 0 1 0 2 1
-pinseq=6
+pinseq=5
 T 1525 850 9 8 1 1 0 6 1
 pinlabel=OUT B
 T 1500 900 5 8 0 1 0 8 1
