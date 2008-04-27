@@ -1,10 +1,11 @@
 PRG            = xarias
-OBJ_B01        = xarias_b01.o hd44780.o lcd.o 
+OBJ_B01        = xarias_b01.o hd44780.o lcd.o
 OBJ_B02        = xarias_b02.o s6b0108.o gLCD.o twi_devs.o
-OBJ_AC         = 
-MCU_TARGET     = atmega32
+OBJ_AC         = xarias_ac.o lcd.o hd44780.o
+MCU_TARGET     = atmega8
 OPTIMIZE       = -Os -mcall-prologues
-F_CPU          = 16000000UL
+F_CPU_MAIN     = 16000000UL
+F_CPU_AC       = 2000000UL
 
 DEFS           =
 LIBS           =
@@ -13,7 +14,8 @@ LIBS           =
 
 CC             = avr-gcc 
 
-CFLAGS        = -g -Wall $(OPTIMIZE) -mmcu=$(MCU_TARGET) $(DEFS) -D "F_CPU=$(F_CPU)" -ffunction-sections
+
+CFLAGS        = -g -Wall $(OPTIMIZE) -mmcu=$(MCU_TARGET) $(DEFS) -ffunction-sections -D "F_CPU=${F_CPU_AC}"
 LDFLAGS       = -Wl,--gc-sections,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.18/
 
 OBJCOPY        = avr-objcopy
@@ -26,8 +28,10 @@ all:
 	@echo "Possible boards are b01, b02 and ac"
 	@echo "See README for more info"
 
+inst_ac: ac
+	avrdude -p m8 -c pony-stk200 -P /dev/parport0 -U flash:w:${PRG}_ac.hex:i -v -E noreset
 
-inst_b%: b%
+inst_%: %
 	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:${PRG}_$*.hex:i -v -E noreset
 
 fuses:
@@ -49,6 +53,8 @@ xarias_b02.elf: ${OBJ_B02}
 
 xarias_ac.elf: ${OBJ_AC}
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+	
 
 clean:
 	rm -rf *.o *.elf *.eps *.png *.bak *.hex

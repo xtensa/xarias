@@ -24,6 +24,9 @@
 #include "hd44780.h"
 #include "lcd.h"
 
+
+FILE lcd_str = FDEV_SETUP_STREAM(lcd_putchar, NULL, _FDEV_SETUP_WRITE);
+
 /*
  * Setup the LCD controller.  First, call the hardware initialization
  * function, then adjust the display attributes we want.
@@ -56,6 +59,9 @@ void lcd_init(void)
    */
   hd44780_outcmd(HD44780_DISPCTL(1, 0, 0));
   hd44780_wait_ready();
+
+
+	stderr = &lcd_str;
 }
 
 void    lcd_cls()
