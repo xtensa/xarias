@@ -11,6 +11,7 @@
  * $Id: lcd.h,v 1.1.2.1 2005/12/28 22:35:08 joerg_wunsch Exp $
  */
 
+#include <stdio.h>
 /*
  * Initialize LCD controller.  Performs a software reset.
  */

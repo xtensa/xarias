@@ -23,7 +23,7 @@ pintype=pas
 }
 V 500 501 316 3 0 0 0 -1 -1 0 -1 -1 -1 -1 -1
 T 900 500 5 10 0 0 0 0 1
-device=NPN_TRANSISTOR
+device=N-MOSFET
 L 400 700 400 300 3 0 0 0 -1 -1
 P 0 500 175 500 1 0 0
 {
