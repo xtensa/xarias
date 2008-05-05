@@ -27,6 +27,7 @@
 
 FILE lcd_str = FDEV_SETUP_STREAM(lcd_putchar, NULL, _FDEV_SETUP_WRITE);
 
+
 /*
  * Setup the LCD controller.  First, call the hardware initialization
  * function, then adjust the display attributes we want.
@@ -34,34 +35,34 @@ FILE lcd_str = FDEV_SETUP_STREAM(lcd_putchar, NULL, _FDEV_SETUP_WRITE);
 void lcd_init(void)
 {
 
-  hd44780_init();
+	hd44780_init();
 
 
-  hd44780_outcmd(HD44780_FNSET(0,1,0));
-  hd44780_wait_ready();
+	hd44780_outcmd(HD44780_FNSET(0,1,0));
+	hd44780_wait_ready();
 
 
-  /*
-   * Clear the display.
-   */
-  hd44780_outcmd(HD44780_CLR);
-  hd44780_wait_ready();
+	/*
+	* Clear the display.
+	*/
+	hd44780_outcmd(HD44780_CLR);
+	hd44780_wait_ready();
 
-  /*
-   * Entry mode: auto-increment address counter, no display shift in
-   * effect.
-   */
-  hd44780_outcmd(HD44780_ENTMODE(1, 0));
-  hd44780_wait_ready();
+	/*
+	* Entry mode: auto-increment address counter, no display shift in
+	* effect.
+	*/
+	hd44780_outcmd(HD44780_ENTMODE(1, 0));
+	hd44780_wait_ready();
 
-  /*
-   * Enable display, deactivate non-blinking cursor.
-   */
-  hd44780_outcmd(HD44780_DISPCTL(1, 0, 0));
-  hd44780_wait_ready();
+	/*
+	* Enable display, deactivate non-blinking cursor.
+	*/
+	hd44780_outcmd(HD44780_DISPCTL(1, 0, 0));
+	hd44780_wait_ready();
 
 
-	stderr = &lcd_str;
+	stdout = &lcd_str;
 }
 
 void    lcd_cls()
