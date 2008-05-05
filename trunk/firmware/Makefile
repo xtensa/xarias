@@ -1,49 +1,87 @@
+
+
+# Program prefix
 PRG            = xarias
-OBJ_B01        = xarias_b01.o hd44780.o lcd.o
-OBJ_B02        = xarias_b02.o s6b0108.o gLCD.o twi_devs.o
-OBJ_AC         = xarias_ac.o lcd.o hd44780.o
-MCU_TARGET     = atmega8
+
+# Programmer settings. Please see avrdude manpage for more details.
+PROGRAMMER     = pony-stk200
+PORT           = /dev/parport0
+
+# Main board settings
+MAIN_MCU_TARGET     = atmega32
+MAIN_F_CPU     	    = 16000000UL
+
+# AC board settings
+AC_MCU_TARGET     = atmega8
+AC_F_CPU          = 8000000UL
+
+OBJ_B01        = xarias_b01.o hd44780_b01.o lcd_b01.o
+OBJ_B02        = xarias_b02.o s6b0108_b02.o gLCD_b02.o twi_devs_b02.o
+OBJ_AC         = xarias_ac.o lcd_ac.o hd44780_ac.o
 OPTIMIZE       = -Os -mcall-prologues
-F_CPU_MAIN     = 16000000UL
-F_CPU_AC       = 2000000UL
 
-DEFS           =
+
+DEFS           = 
 LIBS           =
-
-# You should not have to change anything below here.
-
 CC             = avr-gcc 
 
-
-CFLAGS        = -g -Wall $(OPTIMIZE) -mmcu=$(MCU_TARGET) $(DEFS) -ffunction-sections -D "F_CPU=${F_CPU_AC}"
-LDFLAGS       = -Wl,--gc-sections,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.18/
+CFLAGS         = -g -Wall $(OPTIMIZE) -ffunction-sections
+LDFLAGS        = -Wl,--gc-sections,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.18/
 
 OBJCOPY        = avr-objcopy
 OBJDUMP        = avr-objdump
 
-all:
-	@echo "Usage: make XXX      - build firmware for XXX xarias board"
-	@echo "       make inst_XXX - build and install firmware for XXX board"
-	@echo "       make fuses    - write fuse bits"
+
+CFLAGS        += $(if $(findstring _b01,$@),-mmcu=${MAIN_MCU_TARGET} -D F_CPU=${MAIN_F_CPU},)
+CFLAGS        += $(if $(findstring _b02,$@),-mmcu=${MAIN_MCU_TARGET} -D F_CPU=${MAIN_F_CPU},)
+CFLAGS        += $(if $(findstring _ac,$@),-mmcu=${AC_MCU_TARGET} -D F_CPU=${AC_F_CPU},)
+
+LFUSE          = $(if $(findstring _ac,$@),FF,FF)
+HFUSE          = $(if $(findstring _ac,$@),CF,CF)
+AVRTARGET      = $(if $(findstring _ac,$@),m8,m32)
+
+T1	       = $(patsubst %_ac.o,%.c,$@)
+T2	       = $(patsubst %_b01.o,%.c,$(T1))
+TARGET	       = $(patsubst %_b02.o,%.c,$(T2))
+
+PREREQS        = gLCD.c
+#$(patsubst %_b02.o,%.c,${OBJ_B02})
+
+help:
+	@echo "Usage: make XXX        - build firmware for XXX xarias board"
+	@echo "       make inst_XXX   - build and install firmware for XXX board"
+	@echo "       make fuses_XXX  - write fuse bits"
 	@echo "Possible boards are b01, b02 and ac"
 	@echo "See README for more info"
 
-inst_ac: ac
-	avrdude -p m8 -c pony-stk200 -P /dev/parport0 -U flash:w:${PRG}_ac.hex:i -v -E noreset
+%:
+	@echo "Invalid make target: $@"
+	@echo "Try: make help"
 
 inst_%: %
-	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U flash:w:${PRG}_$*.hex:i -v -E noreset
+	avrdude -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U flash:w:${PRG}_$*.hex:i -v -E noreset
 
-fuses:
-	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U hfuse:w:0xCF:m -v -E noreset
-	avrdude -p m32 -c pony-stk200 -P /dev/parport0 -U lfuse:w:0xFF:m -v -E noreset
+fuses_%:
+	avrdude -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U hfuse:w:0x${HFUSE}:m -v -E noreset
+	avrdude -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U lfuse:w:0x${LFUSE}:m -v -E noreset
 
+xarias_%.o: xarias_%.c xarias_%.h 
+	$(CC) $(CFLAGS) -c $(subst .o,.c,$@) -o $@
 
-b01: ${PRG}_b01.lst text_${PRG}_b01
+%.o: prereqs_% 
+	$(CC) $(CFLAGS) -c $(TARGET) -o $@
 
-b02: ${PRG}_b02.lst text_${PRG}_b02
+prereqs_%_ac prereqs_%_b01 prereqs_%_b02: %.c %.h
+	@cat /dev/null	
 
-ac:  ${PRG}_ac.lst text_${PRG}_ac
+b01: ${PRG}_b01.lst ${PRG}_b01.bin ${PRG}_b01.hex info_${PRG}_b01
+	@cat /dev/null	
+
+b02: ${PRG}_b02.lst ${PRG}_b02.bin ${PRG}_b02.hex info_${PRG}_b02
+	@cat /dev/null	
+
+ac:  ${PRG}_ac.lst ${PRG}_ac.bin ${PRG}_ac.hex info_${PRG}_ac
+	@cat /dev/null	
 
 xarias_b01.elf: ${OBJ_B01}
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
@@ -57,22 +95,27 @@ xarias_ac.elf: ${OBJ_AC}
 	
 
 clean:
-	rm -rf *.o *.elf *.eps *.png *.bak *.hex
+	rm -rf *.o *.elf *.eps *.png *.bak *.hex *.bin
 	rm -rf *.lst *.map $(EXTRA_CLEAN_FILES)
 
 
-%.lst: %.elf
+%.lst: %.elf %.hex
 	$(OBJDUMP) -h -S $< > $@
 
 # Rules for building the .text rom images
 
-text_%: %.elf
-	$(OBJCOPY) -j .text -j .data -O ihex $< $*.hex
-#	$(OBJCOPY) -j .text -j .data -O srec $< $*.srec
-	$(OBJCOPY) -j .text -j .data -O binary $< $*.bin
+info_%: %.elf
 	@echo -n "Size of the $*.bin: "
 	@ls -l $*.bin | cut -d ' ' -f 5 -
 
+%.hex:
+	$(OBJCOPY) -j .text -j .data -O ihex $*.elf $*.hex
+
+%.bin:
+	$(OBJCOPY) -j .text -j .data -O binary $*.elf $*.bin
+
+%.srec:
+	$(OBJCOPY) -j .text -j .data -O srec $*.elf $*.srec
 
 # Rules for building the .eeprom rom images
 

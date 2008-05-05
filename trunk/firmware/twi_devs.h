@@ -24,12 +24,12 @@
  */
 void inline twi_init();
 
-uint8_t twi_write_addr(uint8_t addr);
-uint8_t twi_write_data(uint8_t data);
-uint8_t twi_read_addr(uint8_t addr);
-uint8_t twi_read_data(uint8_t *data, bool islast);
+void twi_write_addr(uint8_t addr);
+void twi_write_data(uint8_t data);
+void twi_read_addr(uint8_t addr);
+void twi_read_data(uint8_t *data, bool islast);
 
-uint8_t inline twi_start();
+void inline twi_start();
 void    inline twi_stop();
 
 void ds1803_write(uint8_t pot, uint8_t val);

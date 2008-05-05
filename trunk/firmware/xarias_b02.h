@@ -78,6 +78,23 @@
 #define ERROR_MR_DATA_NACK_CMD		6
 #define ERROR_MR_DATA_ACK_CMD		7
 
+#include <stdio.h>
+
+/*
+ * Function that displays error code and program part identifier defined by prog_part.
+ * 
+ * Return error codes (more common solution) are not used in this project beacuse of bigger 
+ * memory consumption.
+ */
+void error(uint8_t errcode);
+
+/*
+ * Global variable indicating in which program part we are.
+ * Should be set on the begining of each function that uses error() function.
+ */
+uint8_t prog_part;
+
+
 
 
 #endif

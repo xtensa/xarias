@@ -50,7 +50,6 @@
 #define SPEED_TICKS 2548
 
 
-FILE lcd_str = FDEV_SETUP_STREAM(lcd_putchar, NULL, _FDEV_SETUP_WRITE);
 
 uint32_t passed_seconds=0, tcnt0_overs=0, passed_speed_ticks=0;
 uint16_t clock_ticks=0, inj_ticks=0, tcnt0_overs_sec=0;
@@ -59,10 +58,8 @@ uint16_t clock_ticks=0, inj_ticks=0, tcnt0_overs_sec=0;
 
 void error(char *msg)
 {
-	stderr = &lcd_str;
-
 	lcd_locate(2,1);
-	fprintf(stderr,"ERR: %s",msg);
+	printf("ERR: %s",msg);
 }
 
 
@@ -262,8 +259,6 @@ uint32_t power(uint32_t x, uint8_t y)
 
 int main()
 {
-	stderr = &lcd_str;
-
 	ioinit();
 
 	return 0;
@@ -306,26 +301,26 @@ SIGNAL(SIG_INTERRUPT0)
 
 		// printing speed in km/h and m/s
 		lcd_locate(1,1);
-		fprintf(stderr, "%3u km/h  %3u m/s",m_speed_km,m_speed_m);
+		printf( "%3u km/h  %3u m/s",m_speed_km,m_speed_m);
 
 		// printing fuel consumption
 		lcd_locate(2,1);
-		fprintf(stderr, " %3u.%u l/100km %2u.%u l/h",ROUND1(m_fuel_100,3,1),ROUND2(m_fuel_100,3,1),ROUND1(m_fuel_h,3,1),ROUND2(m_fuel_h,3,1));
+		printf( " %3u.%u l/100km %2u.%u l/h",ROUND1(m_fuel_100,3,1),ROUND2(m_fuel_100,3,1),ROUND1(m_fuel_h,3,1),ROUND2(m_fuel_h,3,1));
 
 		// temporarily: checking for error
-		if(ROUND2(m_fuel_100,3,1)>9) { lcd_locate(1,1); fprintf(stderr,"%u",m_fuel_100); while(1);}
+		if(ROUND2(m_fuel_100,3,1)>9) { lcd_locate(1,1); printf("%u",m_fuel_100); while(1);}
 		
 		// avarage speed and fuel consumption
 		lcd_locate(3,1);
-		fprintf(stderr, "%3u km/h %3u.%u l/100",avg_speed_km,ROUND1(avg_fuel_100,3,1),ROUND2(avg_fuel_100,3,1));
+		printf( "%3u km/h %3u.%u l/100",avg_speed_km,ROUND1(avg_fuel_100,3,1),ROUND2(avg_fuel_100,3,1));
 		
 		// printing journey time
 		lcd_locate(4,1);
-		fprintf(stderr,"%02u:%02u:%02u", (uint8_t)(passed_seconds/3600),(uint8_t)((passed_seconds%3600)/60),(uint8_t)(passed_seconds%60));
+		printf("%02u:%02u:%02u", (uint8_t)(passed_seconds/3600),(uint8_t)((passed_seconds%3600)/60),(uint8_t)(passed_seconds%60));
 
 		// printing passed dist
 		lcd_locate(4,10);
-		fprintf(stderr, "%4u.%03u km",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
+		printf( "%4u.%03u km",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
 			
 	
 		passed_seconds++;

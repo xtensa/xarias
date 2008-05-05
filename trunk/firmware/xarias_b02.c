@@ -187,13 +187,13 @@ int8_t temp_out, temp_in;
 
 
 
-void error(uint8_t data1, uint8_t data2)
+void error(uint8_t errcode)
 {
 	uint8_t i;
 	gLCD_frame(30,22,106,34,2,true);
 	gLCD_frame(32,24,104,32,1,false);
 	gLCD_locate(33,25);
-	printf("ERROR: %02u-%02u", data1, data2);
+	printf("ERROR: %02u-%02u", prog_part, errcode);
 	for(i=0;i<100;i++) _delay_ms(500);
 	gLCD_cls();
 	if(modestate==MODE_MAIN)
@@ -1081,7 +1081,7 @@ int main()
 				}
 			} break;
 
-			default: error(ERROR_UNKNOWN_MODE, ERROR_NONE);
+			default: error(ERROR_UNKNOWN_MODE);
 		}
 		/*
 		 **************************************************
@@ -1428,7 +1428,6 @@ int main()
 					gLCD_locate(0,42);
 					printf("%02u%s:%02u:%02u  %u", hours, (is12h?pmstr:""),minutes, seconds, (uint8_t)is12h );
  
-gLCD_locate(2,2);
 				} break;
 
 			} // switch
@@ -1458,14 +1457,23 @@ SIGNAL(SIG_INTERRUPT0)
 		
 		rpm_ticks=TCNT1;
 		TCNT1=0;
-		
-
-		passed_seconds++;
-		if(rpm_ticks) last_inj_ticks=inj_ticks;
+	
+		/*
+		 * we do calculations only if engine is on
+		 */
+		if(rpm_ticks) 
+		{
+			passed_seconds++;
+			last_inj_ticks=inj_ticks;
+			passed_inj_ticks += last_inj_ticks;
+			passed_speed_ticks += speed_ticks;
+		}
+		else
+		{
+			last_inj_ticks = 0;
+		}
 		inj_ticks=0;
 	
-		passed_speed_ticks += speed_ticks;
-		passed_inj_ticks += last_inj_ticks;
 	
 
 		if(modestate==MODE_MAIN || modestate==MODE_DATETIME_SETTINGS)
@@ -1490,5 +1498,5 @@ SIGNAL(SIG_OVERFLOW0)
 
 SIGNAL(SIG_OVERFLOW1)
 {
-	error(ERROR_RPM_COUNTER_OVERFLOW,ERROR_NONE);
+	error(ERROR_RPM_COUNTER_OVERFLOW);
 }

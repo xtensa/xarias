@@ -27,8 +27,6 @@
 #define VAL_TO_DS1307(x) x=(((x)/10)<<4)|((x)-(x)/10*10)
 #define DS1307_TO_VAL(x) x=((x)>>4)*10+((x)&0x0F)
 
-extern void error(uint8_t data1, uint8_t data2);
-
 /*
  * This function sets up TWI bus
  */
@@ -42,7 +40,7 @@ void inline twi_init()
 	TWSR = 0;  // prescaller = 1
 }
 
-uint8_t inline twi_start()
+void inline twi_start()
 {
 	/*
 	 * enablibg TWI and sending START condition
@@ -53,16 +51,14 @@ uint8_t inline twi_start()
 	 * waiting for TWINT flag set
 	 */
 	while (!(TWCR & _BV(TWINT)));
-	if ( TW_STATUS != TW_START && TW_STATUS != TW_REP_START ) return ERROR_TWI_START_CMD;
-
-	return ERROR_NONE;
+	if ( TW_STATUS != TW_START && TW_STATUS != TW_REP_START ) error(ERROR_TWI_START_CMD);
 }
 
 /*
  * This function sends the device address through TWI bus.
  * It returns 0 on success and 1 if failed.
  */
-uint8_t twi_rw_addr(uint8_t addr, uint8_t mode)
+void twi_rw_addr(uint8_t addr, uint8_t mode)
 {
 	TWDR = mode | addr; 
 	TWCR = _BV(TWINT) | _BV(TWEN);
@@ -74,27 +70,26 @@ uint8_t twi_rw_addr(uint8_t addr, uint8_t mode)
 
 	if ( TW_STATUS != (mode==TW_WRITE ? TW_MT_SLA_ACK : TW_MR_SLA_ACK) ) 
 	{
-		return ERROR_Mx_SLA_ACK_CMD;
+		error(ERROR_Mx_SLA_ACK_CMD);
 	}
 
-	return ERROR_NONE;
 }
 
-uint8_t twi_write_addr(uint8_t addr) 
+void twi_write_addr(uint8_t addr) 
 {
-	return twi_rw_addr(addr,TW_WRITE);
+	twi_rw_addr(addr,TW_WRITE);
 }
 
-uint8_t twi_read_addr(uint8_t addr)
+void twi_read_addr(uint8_t addr)
 {
-	return twi_rw_addr(addr,TW_READ);
+	twi_rw_addr(addr,TW_READ);
 }
 
 /*
  * This function sends one byte through TWI bus.
  * It returns 0 on success and 1 if failed.
  */
-uint8_t twi_write_data(uint8_t data)
+void twi_write_data(uint8_t data)
 {
 	TWDR = data;
 	TWCR = _BV(TWINT) | _BV(TWEN);
@@ -106,13 +101,12 @@ uint8_t twi_write_data(uint8_t data)
 
 	if ( TW_STATUS != TW_MT_DATA_ACK) 
 	{
-		return ERROR_MT_DATA_ACK_CMD;
+		error(ERROR_MT_DATA_ACK_CMD);
 	}
-	return ERROR_NONE;
 }
 
 
-uint8_t twi_read_data(uint8_t *data, bool islast)
+void twi_read_data(uint8_t *data, bool islast)
 {
 
 	TWCR = _BV(TWINT) | _BV(TWEN) | (islast?0:_BV(TWEA));
@@ -124,16 +118,13 @@ uint8_t twi_read_data(uint8_t *data, bool islast)
 
 	if ( islast && TW_STATUS != TW_MR_DATA_NACK) 
 	{
-		return ERROR_MR_DATA_NACK_CMD;
+		error(ERROR_MR_DATA_NACK_CMD);
 	}
 	if ( !islast && TW_STATUS != TW_MR_DATA_ACK) 
 	{
-		return ERROR_MR_DATA_ACK_CMD;
+		error(ERROR_MR_DATA_ACK_CMD);
 	}
 	*data = TWDR;
-
-	return ERROR_NONE; 
-
 }
 
 
