@@ -27,10 +27,12 @@
 #define SCREEN_BRIGHTNESS_MIN 28
 #define SCREEN_BRIGHTNESS_MAX 150
 
-
+/*
+ * List of addresses of devices on TWI bus
+ */
 #define TWIADDR_DS1307 		0xD0
 #define TWIADDR_MAINPOT 	0x50
-
+#define TWIADDR_AC		0xAA
 
 /*
  * It is assumed that pins of LCD are connected
@@ -69,14 +71,23 @@
 /*
  * Error codes
  */
-#define ERROR_NONE 			0
-#define ERROR_UNKNOWN_MODE 		1
-#define ERROR_RPM_COUNTER_OVERFLOW	2
-#define ERROR_TWI_START_CMD		3
-#define ERROR_Mx_SLA_ACK_CMD		4
-#define ERROR_MT_DATA_ACK_CMD		5
-#define ERROR_MR_DATA_NACK_CMD		6
-#define ERROR_MR_DATA_ACK_CMD		7
+#define ERROR_NONE 			0x00
+#define ERROR_UNKNOWN_MODE 		0x01
+#define ERROR_RPM_COUNTER_OVERFLOW	0x02
+
+#define ERROR_DS1307_SEC		0xB0
+#define ERROR_DS1307_MIN		0xB1
+#define ERROR_DS1307_HOUR		0xB2
+#define ERROR_DS1307_DATE		0xB3
+#define ERROR_DS1307_MONTH		0xB4
+#define ERROR_DS1307_YEAR		0xB5
+
+#define ERROR_TWI_START_CMD		0xE3
+#define ERROR_Mx_SLA_ACK_CMD		0xE4
+#define ERROR_MT_DATA_ACK_CMD		0xE5
+#define ERROR_MR_DATA_NACK_CMD		0xE6
+#define ERROR_MR_DATA_ACK_CMD		0xE7
+
 
 #include <stdio.h>
 
@@ -95,6 +106,12 @@ void error(uint8_t errcode);
 uint8_t prog_part;
 
 
-
+/*
+ * Use one of the below consts to assign to prog_part.
+ */
+#define PROGPART_MAIN 			0x01
+#define PROGPART_INIT			0x02
+#define PROGPART_DS1307_READTIME	0xA0
+#define PROGPART_DS1307_WRITETIME	0xA1
 
 #endif

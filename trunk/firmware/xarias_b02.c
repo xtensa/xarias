@@ -55,7 +55,8 @@
 /*
  * Number of ticks per one kilometer
  */
-#define SPEED_TICKS 2548
+//#define SPEED_TICKS 2548
+#define SPEED_TICKS 2325
 
 
 //#define KB_SET(i)   kb_state |=  _BV(i)
@@ -193,8 +194,8 @@ void error(uint8_t errcode)
 	gLCD_frame(30,22,106,34,2,true);
 	gLCD_frame(32,24,104,32,1,false);
 	gLCD_locate(33,25);
-	printf("ERROR: %02u-%02u", prog_part, errcode);
-	for(i=0;i<100;i++) _delay_ms(500);
+	printf("ERROR: %02x-%02x", prog_part, errcode);
+	for(i=0;i<50;i++) _delay_ms(50);
 	gLCD_cls();
 	if(modestate==MODE_MAIN)
 	{
@@ -211,11 +212,19 @@ static void xarias_init(void)
 {
 	uint8_t byteA, byteB, byteC;
 
+	prog_part = PROGPART_INIT;
+
 	gLCD_switchon();
 	/*
 	 * Setting up TWI bus.
 	 */
 	twi_init();
+
+
+	ds1803_write(0,contrast);
+	ds1803_write(1,brightness);
+
+
 	twi_start();
 
 	/*
@@ -608,13 +617,14 @@ int main()
 	uint8_t ac_pressed=0;
 	
 
-
 	/*
 	 * Wait for power to stabilize
 	 */
 	_delay_ms(20);
 
 	xarias_init();
+
+	prog_part = PROGPART_MAIN;
 
 	while(1)
 	{
@@ -1209,7 +1219,7 @@ int main()
 					gLCD_locate(2,47);
 					printf("TotFuel");
 					gLCD_locate(2,55);
-					printf("%5u.%u",ROUND1(tot_fuel,3,1), ROUND2(tot_fuel,3,1));
+					printf("%3u.%03u",ROUND1(tot_fuel,3,3), ROUND2(tot_fuel,3,3));
 
 					/*
 					 * Trip fuel cost
@@ -1459,8 +1469,9 @@ SIGNAL(SIG_INTERRUPT0)
 		TCNT1=0;
 	
 		/*
-		 * we do calculations only if engine is on
+		 * we do calculations only if engine is running
 		 */
+	//	rpm_ticks=1;
 		if(rpm_ticks) 
 		{
 			passed_seconds++;

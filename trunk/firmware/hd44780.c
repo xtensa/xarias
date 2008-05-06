@@ -14,7 +14,7 @@
  * $Id: hd44780.c,v 1.1.2.3 2006/10/08 21:51:14 joerg_wunsch Exp $
  */
 
-#include "defines.h"
+#include "xarias_b01.h"
 
 #include <stdbool.h>
 #include <stdint.h>
