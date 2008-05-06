@@ -21,19 +21,9 @@
 
 #ifndef GLCD_h
 #define GLCD_h
-//#include "xarias_b02.h"
-//#include "s6b0108.h"
 
-
-//#include <ctype.h>
-//#include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
-
-//#include <avr/io.h>
-//#include <avr/pgmspace.h>
-
-//#include <avr/interrupt.h>
 
 
 /*

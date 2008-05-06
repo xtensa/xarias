@@ -1,7 +1,7 @@
 /*
  * XARIAS carputer project
  *
- * Copyright (c) 2008 by Roman Pszonczenko xtensa <_at_> go0ogle mail
+ * Copyright (c) 2007 by Roman Pszonczenko xtensa <_at_> gmail
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -18,23 +18,25 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
+/* HD44780 LCD port connections */
+/*#define HD44780_PORT D
+#define HD44780_RS PORT0
+#define HD44780_RW PORT1
+#define HD44780_E  PORT2
+// The data bits have to be in ascending order. 
+#define HD44780_D4 PORT4
+#define HD44780_D5 PORT5
+#define HD44780_D6 PORT6
+#define HD44780_D7 PORT7
+*/
 
-/*
- * This function sets up TWI bus
- */
-void inline twi_init();
-
-void twi_write_addr(uint8_t addr);
-void twi_write_data(uint8_t data);
-void twi_read_addr(uint8_t addr);
-void twi_read_data(uint8_t *data, bool islast);
-
-void inline twi_start();
-void    inline twi_stop();
-
-void ds1803_write(uint8_t pot, uint8_t val);
-void ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, char *pmstr, uint8_t hours, uint8_t date, uint8_t month, uint8_t year);
-void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, char *pmstr, uint8_t *hours, 
-			uint8_t *day, uint8_t *date, uint8_t *month, uint8_t *year);
-
-
+/* HD44780 LCD port connections */
+#define HD44780_PORT A
+#define HD44780_RS PORT0
+#define HD44780_RW PORT6
+#define HD44780_E  PORT1
+/* The data bits have to be in ascending order. */
+#define HD44780_D4 PORT2
+#define HD44780_D5 PORT3
+#define HD44780_D6 PORT4
+#define HD44780_D7 PORT5

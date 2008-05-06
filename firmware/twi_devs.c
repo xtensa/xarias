@@ -36,7 +36,7 @@ void inline twi_init()
 	 * SCL = CPU_Freq / ( 16 + 2 * TWBR * 4^TWPS )
 	 */
 
-	TWBR = 98; // with prescaller = 1 gives us 100kHz TWI bus
+	TWBR = 98; // with 16MHz cpu and prescaller = 1 gives us 100kHz TWI bus
 	TWSR = 0;  // prescaller = 1
 }
 
@@ -168,16 +168,19 @@ void ds1803_write(uint8_t pot, uint8_t val)
 }
 
 
-uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, char *pmstr, uint8_t hours, uint8_t date, uint8_t month, uint8_t year)
+void ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, char *pmstr, uint8_t hours, uint8_t date, uint8_t month, uint8_t year)
 {
-	if(seconds>59) return 1;
+	uint8_t prev_prog_part=prog_part;
+	prog_part = PROGPART_DS1307_WRITETIME;
+
+	if(seconds>59) error(ERROR_DS1307_SEC);
 	VAL_TO_DS1307(seconds);
 	seconds &= 0x7F;
 
-	if(minutes>59) return 2;
+	if(minutes>59) error(ERROR_DS1307_MIN);
 	VAL_TO_DS1307(minutes);
 
-	if( hours > 23 ) return 3;
+	if( hours > 23 ) error(ERROR_DS1307_HOUR);
 	if( is12h ) // 12h mode
 	{
 		VAL_TO_DS1307(hours);
@@ -190,13 +193,13 @@ uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, char *pm
 		VAL_TO_DS1307(hours);
 	}
 
-	if( date > 31 || !date) return 4;
+	if( date > 31 || !date) error(ERROR_DS1307_DATE);
 	VAL_TO_DS1307(date);
 
-	if( month > 12 || !month ) return 5;
+	if( month > 12 || !month ) error(ERROR_DS1307_MONTH);
 	VAL_TO_DS1307(month);
 
-	if( year > 99 ) return 6;
+	if( year > 99 ) error(ERROR_DS1307_YEAR);
 	VAL_TO_DS1307(year);
 
 
@@ -212,13 +215,16 @@ uint8_t ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, char *pm
 	twi_write_data(year);
 	twi_stop();
 
-	return 0;
+	prog_part = prev_prog_part;
 }
 
 
 void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, char *pmstr, uint8_t *hours, 
 			uint8_t *day, uint8_t *date, uint8_t *month, uint8_t *year)
 {
+	uint8_t prev_prog_part=prog_part;
+	prog_part = PROGPART_DS1307_READTIME;
+
 	twi_start();
 	twi_write_addr(TWIADDR_DS1307);
 	twi_write_data(0);
@@ -262,4 +268,7 @@ void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, char *p
 	DS1307_TO_VAL( (*date) );
 	DS1307_TO_VAL( (*month) );
 	DS1307_TO_VAL( (*year) );
+
+	prog_part = prev_prog_part;
 }
+

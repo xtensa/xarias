@@ -11,7 +11,7 @@
  * $Id: lcd.c,v 1.1.2.1 2005/12/28 22:35:08 joerg_wunsch Exp $
  */
 
-#include "defines.h"
+#include "xarias_b01.h"
 
 #include <stdbool.h>
 #include <stdint.h>
