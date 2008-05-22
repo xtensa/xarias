@@ -24,6 +24,26 @@
 #include <avr/interrupt.h>
 #include "xarias_b02.h"
 
+#include <util/twi.h>
+#include <stdbool.h>
+#include "one_wire.h"
+
+
+#define MODE_MANUAL	0
+#define MODE_AUTO 	1
+
+#define TURN_RELAY_ON() PORTD |= _BV(6)
+#define TURN_RELAY_OFF() PORTD &= ~_BV(6)
+
+#define TURN_AC_ON() PORTD |= _BV(7)
+#define TURN_AC_OFF() PORTD &= ~_BV(7)
+
+#define MAX_PARAMS_CNT 		3
+#define MAX_RET_VALS_CNT	(8 * ONEW_MAX_DEVICE_COUNT + 1)
+
+int16_t temp[ONEW_MAX_DEVICE_COUNT+2]={0}; // two extra virtual sensors
+uint8_t ac_mode = 0; // manual, off
+
 void xarias_ac_init()
 {
         /*
@@ -46,23 +66,16 @@ void xarias_ac_init()
 	 */
 	TWAR = TWIADDR_AC & 0xFE;
 
-//	DDRC  &= ~(_BV(PORT4)|_BV(PORT5));
-//	PORTC &= ~(_BV(PORT4)|_BV(PORT5));
+	DDRC  &= ~(_BV(PORT4)|_BV(PORT5));
+	//PORTC &= ~(_BV(PORT4)|_BV(PORT5));
+	//PORTC |= _BV(PORT4)|_BV(PORT5);
 
 	/*
-	 * Enabling TWI
+	 * Enabling TWI, ack and TWI interrupt
 	 */
-	TWCR &= ~(_BV(TWSTA) | _BV(TWSTO));
-	//TWCR |= _BV(TWEN) | _BV(TWEA);
+	TWCR = _BV(TWEN) | _BV(TWIE) | _BV(TWEA);
 
-}
 
-int main()
-{
-
-	uint8_t cmp=255;
-
-	xarias_ac_init();
 	// set PWM, phase correct mode
 	TCCR2 |= _BV(WGM20);
 	TCCR2 &= ~_BV(WGM21);
@@ -83,16 +96,188 @@ int main()
 	// 1 1 0 clkT2S/256 	(From prescaler)	CPU_FREQ/(256*2*256)	61 Hz		122
 	// 1 1 1 clkT2S/1024 	(From prescaler)	CPU_FREQ/(256*2*1024)	7 Hz		14
 	
-	TCCR2 |= _BV(CS20) ; // 15625caler for 8Mhz
+	TCCR2 |= _BV(CS20) ; // 15625 PWM freq for 8Mhz
 
 	// Setting OC2 as output
 	DDRB |= _BV(3);
 	//PORTB |= _BV(3);
+	
+	// Setting relay (6) and AC (7) pins as output
+	DDRD |= _BV(6) | _BV(7);
 
+}
+
+void ac_set_mode(volatile uint8_t new_ac_mode)
+{
+	ac_mode=new_ac_mode;
+	
+	PORTB |= 1;
+
+	if( ac_mode & _BV(AC_MODE) ) // AUTO 
+	{
+		if( ac_mode & _BV(AC_ONOFF) )
+		{
+			TURN_RELAY_ON();
+		}
+		else
+		{
+			TURN_AC_OFF();
+			TURN_RELAY_OFF();
+		}
+	}
+	else
+	{
+		TURN_RELAY_OFF();
+		if( ac_mode & _BV(AC_ONOFF) )
+		{
+			TURN_AC_ON();
+		}
+		else
+		{
+			TURN_AC_OFF();
+		}
+	}
+
+}
+
+int main()
+{
+
+	uint8_t cmp=255;
+
+	xarias_ac_init();
 
 	OCR2=cmp;
 
-
+	DDRB |= 1;
+	PORTB &= ~1;
 
 	return 0;
 }
+SIGNAL(SIG_2WIRE_SERIAL)
+{
+	static volatile uint8_t byte_no, cmd=AC_CMD_NOP, params[MAX_PARAMS_CNT], ret_vals[MAX_RET_VALS_CNT], ret_vals_cnt;
+	int32_t temperature;
+	uint8_t i,j;
+
+	switch(TW_STATUS)
+	{
+		/*
+		 * Slave receiver mode
+		 */
+		case TW_SR_SLA_ACK: 
+		{
+			byte_no=0;
+		} break;
+
+		case TW_SR_DATA_ACK:
+//		case TW_SR_DATA_NACK:
+		{
+			if(byte_no>MAX_PARAMS_CNT) break;
+			if(!byte_no) cmd=TWDR; // first byte is always command
+			else params[byte_no-1]=TWDR;
+
+			if(cmd==AC_CMD_READ_TEMP && byte_no==1)
+			{
+				temperature=temp[params[0]];
+				temperature=ds18b20_temp_to_decimal((int16_t)temperature);
+				temperature=ds18b20_temp_from_decimal(temperature);
+				temperature=ds18b20_temp_to_decimal((int16_t)temperature);
+
+				
+				for(i=0;i<4;i++)
+					ret_vals[i] = (temperature >> (i*8))&0xFF;
+
+				ret_vals_cnt=4;
+
+			}
+			
+			if(cmd==AC_CMD_WRITE_TEMP && byte_no==1)
+			{
+				// ....
+			}
+			
+			if(cmd==AC_CMD_SET_MODE && byte_no==1)
+			{
+				ac_set_mode(params[0]);
+			}
+
+			if(cmd==AC_CMD_SEARCH_1W_DEVS)
+			{
+				onew_search_addresses();
+				
+			//	onew_dev_num=2;
+			//	onew_dev_list[0]=0x23ef67ab06ULL;
+			//	onew_dev_list[1]=0x10ec90dd56ea13aaULL;
+				
+				ret_vals[0] = onew_dev_num;
+				for(i=0;i<onew_dev_num;i++)
+				{
+					for(j=0;j<8;j++)
+					{
+						ret_vals[i*8+j+1] = (uint8_t)((onew_dev_list[i] >> (8*j))&0xff);
+					}
+				}
+				ret_vals_cnt = onew_dev_num*8+1;
+			}
+
+			byte_no++;
+		} break;
+
+		case TW_SR_STOP:
+		{
+			cmd=AC_CMD_NOP;
+		} break;
+
+		/*
+		 * Slave transmitter mode
+		 */
+		case TW_ST_SLA_ACK:
+		case TW_ST_DATA_ACK:
+		{
+			if(TW_STATUS==TW_ST_SLA_ACK) byte_no=0;
+			if(byte_no>=ret_vals_cnt) break;
+			TWDR=ret_vals[byte_no];
+			byte_no++;
+		} break;
+
+/*
+		case TW_ST_STOP:
+		{
+			cmd=AC_CMD_NOP;
+		} break;
+*/
+
+	}
+
+	TWCR |= _BV(TWINT);
+}
+
+SIGNAL(SIG_INTERRUPT0)
+{
+	static uint16_t clock_ticks=0;
+	uint8_t i;
+
+	if(!clock_ticks)
+	{
+		for(i=0;i<onew_dev_num;i++)
+		{
+			temp[i] = ds18b20_read_temp(i);
+			ds18b20_convert_temp(i);
+		}
+		/*
+		 * Calculating average temperatures FIXME
+		 */
+		temp[3]=temp[0];
+		temp[4]=temp[1];
+	}
+
+	clock_ticks++;
+	if(clock_ticks==32768)
+	{
+		clock_ticks=0;
+	}
+
+}
+
+

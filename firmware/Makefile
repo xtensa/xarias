@@ -17,15 +17,15 @@ AC_F_CPU          = 8000000UL
 
 OBJ_B01        = xarias_b01.o hd44780_b01.o lcd_b01.o
 OBJ_B02        = xarias_b02.o s6b0108_b02.o gLCD_b02.o twi_devs_b02.o
-OBJ_AC         = xarias_ac.o 
+OBJ_AC         = xarias_ac.o one_wire_ac.o #twi_slave_ac.o 
 OPTIMIZE       = -Os -mcall-prologues
 
 
-DEFS           = 
+#DEFS           = -D DEBUG 
 LIBS           =
 CC             = avr-gcc 
 
-CFLAGS         = -g -Wall $(OPTIMIZE) -ffunction-sections
+CFLAGS         = -g -Wall $(OPTIMIZE) -ffunction-sections ${DEFS}
 LDFLAGS        = -Wl,--gc-sections,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.18/
 
 OBJCOPY        = avr-objcopy
@@ -36,7 +36,7 @@ CFLAGS        += $(if $(findstring _b01,$@),-mmcu=${MAIN_MCU_TARGET} -D F_CPU=${
 CFLAGS        += $(if $(findstring _b02,$@),-mmcu=${MAIN_MCU_TARGET} -D F_CPU=${MAIN_F_CPU},)
 CFLAGS        += $(if $(findstring _ac,$@),-mmcu=${AC_MCU_TARGET} -D F_CPU=${AC_F_CPU},)
 
-LFUSE          = $(if $(findstring _ac,$@),E4,FF)
+LFUSE          = $(if $(findstring _ac,$@),A4,FF)
 HFUSE          = $(if $(findstring _ac,$@),D9,CF)
 AVRTARGET      = $(if $(findstring _ac,$@),m8,m32)
 
@@ -44,8 +44,6 @@ T1	       = $(patsubst %_ac.o,%.c,$@)
 T2	       = $(patsubst %_b01.o,%.c,$(T1))
 TARGET	       = $(patsubst %_b02.o,%.c,$(T2))
 
-PREREQS        = gLCD.c
-#$(patsubst %_b02.o,%.c,${OBJ_B02})
 
 help:
 	@echo "Usage: make XXX        - build firmware for XXX xarias board"
@@ -58,12 +56,15 @@ help:
 	@echo "Invalid make target: $@"
 	@echo "Try: make help"
 
+#debug: clean
+#	@echo "Debug enabled"
+
 inst_%: %
-	avrdude -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U flash:w:${PRG}_$*.hex:i -v -E noreset
+	avrdude -V -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U flash:w:${PRG}_$*.hex:i -v -E noreset
 
 fuses_%:
-	avrdude -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U hfuse:w:0x${HFUSE}:m -v -E noreset
-	avrdude -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U lfuse:w:0x${LFUSE}:m -v -E noreset
+	avrdude -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U hfuse:w:0x${HFUSE}:m -v -E noreset 
+	avrdude -p ${AVRTARGET} -c ${PROGRAMMER} -P ${PORT} -U lfuse:w:0x${LFUSE}:m -v -E noreset 
 
 xarias_%.o: xarias_%.c xarias_%.h 
 	$(CC) $(CFLAGS) -c $(subst .o,.c,$@) -o $@
@@ -97,6 +98,7 @@ xarias_ac.elf: ${OBJ_AC}
 clean:
 	rm -rf *.o *.elf *.eps *.png *.bak *.hex *.bin
 	rm -rf *.lst *.map $(EXTRA_CLEAN_FILES)
+
 
 
 %.lst: %.elf 

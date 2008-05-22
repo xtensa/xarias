@@ -19,22 +19,43 @@
  */
 
 
+#ifndef _TWI_DEVS_H_
+#define _TWI_DEVS_H_
+
+/*
+ * This is global variable that is used to read or write to I2C bus.
+ */
+uint8_t twi_data_buf[13];
+
+
 /*
  * This function sets up TWI bus
  */
 void inline twi_init();
 
-void twi_write_addr(uint8_t addr);
-void twi_write_data(uint8_t data);
-void twi_read_addr(uint8_t addr);
-void twi_read_data(uint8_t *data, bool islast);
+//uint8_t inline twi_write_addr(uint8_t addr);
+//uint8_t inline twi_write_byte(uint8_t data);
+//uint8_t twi_read_addr(uint8_t addr);
+//uint8_t twi_read_byte(uint8_t *data, bool islast);
 
-void inline twi_start();
+void twi_read_str  (uint8_t dev_addr, uint8_t count, bool release_twi);
+void twi_write_str (uint8_t dev_addr, uint8_t count, bool release_twi);
+
+
+uint8_t        twi_start();
 void    inline twi_stop();
 
+/*
+ * DS1803 routines
+ */
 void ds1803_write(uint8_t pot, uint8_t val);
+
+/*
+ * DS1307 routines
+ */
+void 	ds1307_write_ctrl();
 void ds1307_write_time(uint8_t seconds, uint8_t minutes, bool is12h, char *pmstr, uint8_t hours, uint8_t date, uint8_t month, uint8_t year);
 void ds1307_read_time(  uint8_t *seconds, uint8_t *minutes, bool *is12h, char *pmstr, uint8_t *hours, 
 			uint8_t *day, uint8_t *date, uint8_t *month, uint8_t *year);
 
-
+#endif

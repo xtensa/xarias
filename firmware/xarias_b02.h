@@ -1,3 +1,23 @@
+/*
+ * XARIAS carputer project
+ *
+ * Copyright (c) 2008 by Roman Pszonczenko xtensa <_at_> go0ogle mail
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program; if not, write to the Free Software
+ *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ */
+
 #ifndef XARIAS_B02_h
 #define XARIAS_B02_h
 
@@ -32,7 +52,29 @@
  */
 #define TWIADDR_DS1307 		0xD0
 #define TWIADDR_MAINPOT 	0x50
+#define TWIADDR_MAINBOARD	0xBA
 #define TWIADDR_AC		0xAA
+
+
+
+#define AC_TEMP_OUT_SENSOR	0
+#define AC_TEMP_IN_SENSOR_1	1
+#define AC_TEMP_IN_SENSOR_2	2
+
+/*
+ * The following commands are accepted through I2C bus
+ */
+#define AC_CMD_NOP	 	0x90 // params: none		return: none
+#define AC_CMD_READ_TEMP 	0x91
+#define AC_CMD_WRITE_TEMP	0x92 
+#define AC_CMD_SET_MODE		0x93 // params: mode mask; 	return: none
+#define AC_CMD_SEARCH_1W_DEVS 	0x94 // params: none       	return: none 
+
+/*
+ * Mode mask bits
+ */
+#define AC_MODE			0 // 0 - Manual; 1 - Auto
+#define AC_ONOFF		1 // 0 - Off;    1 - On
 
 /*
  * It is assumed that pins of LCD are connected
@@ -82,12 +124,13 @@
 #define ERROR_DS1307_MONTH		0xB4
 #define ERROR_DS1307_YEAR		0xB5
 
+/*
 #define ERROR_TWI_START_CMD		0xE3
 #define ERROR_Mx_SLA_ACK_CMD		0xE4
 #define ERROR_MT_DATA_ACK_CMD		0xE5
 #define ERROR_MR_DATA_NACK_CMD		0xE6
 #define ERROR_MR_DATA_ACK_CMD		0xE7
-
+*/
 
 #include <stdio.h>
 
@@ -111,7 +154,7 @@ uint8_t prog_part;
  */
 #define PROGPART_MAIN 			0x01
 #define PROGPART_INIT			0x02
-#define PROGPART_DS1307_READTIME	0xA0
-#define PROGPART_DS1307_WRITETIME	0xA1
+#define PROGPART_DS1307_READ		0xA0
+#define PROGPART_DS1307_WRITE		0xA1
 
 #endif
