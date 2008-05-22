@@ -18,9 +18,6 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#include "xarias_b02.h"
-#include "s6b0108.h"
-
 
 #include <ctype.h>
 #include <stdint.h>
@@ -35,6 +32,8 @@
 #include <util/twi.h>
 #include <avr/interrupt.h>
 
+#include "xarias_b02.h"
+#include "xarias_ac.h"
 #include "gLCD.h"
 #include "twi_devs.h"
 //#include "../utils/out.h"
@@ -75,9 +74,15 @@
 
 
 /*
+ * Variable is used in TWI routines. Should be increased 
+ * every second.
+ */
+volatile uint8_t debug_seconds;
+
+/*
  * Main menu variables.
  */
-uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED;
+uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SERVICE;//SPEED;
 #define MAIN_MENU_COUNT 6
 char mainmenu_strings[6][19]={	"Trip settings",
 				"AirCon settings",
@@ -115,13 +120,11 @@ uint8_t aflags;
 #define AFLAGS_SET(a) 	aflags|=(a)
 #define AFLAGS_UNSET(a) aflags&=~(a)
 #define AFLAGS_ISSET(a) (aflags&(a))
-#define FLAG_LCD_UPDATE   	1
-#define FLAG_MODE_CHANGED 	2
-#define FLAG_KB_STH_PRESSED 	4
-#define FLAG_AC_ONOFF		8	// 0 - off, 1 - on
-#define FLAG_AC_MODE		16	// 0 - manual, 1 - auto
-
-
+#define FLAG_AC_MODE		_BV(0)	// 0 - manual, 1 - auto
+#define FLAG_AC_ONOFF		_BV(1)	// 0 - off, 1 - on
+#define FLAG_LCD_UPDATE   	_BV(2)
+#define FLAG_MODE_CHANGED 	_BV(3)
+#define FLAG_KB_STH_PRESSED 	_BV(4)
 
 /*
  * This array is used to store keyboard states
@@ -177,12 +180,13 @@ void set_mode(uint8_t mode)
  */
 uint16_t tcnt0_overs_sec=0, speed_ticks=0, fuel_cost=420;
 uint64_t passed_inj_ticks=0;
-uint32_t passed_seconds=0, tcnt0_overs=0, passed_speed_ticks=0, tot_fuel=0, tot_cost=0;
+volatile uint32_t passed_seconds=0;
+uint32_t tcnt0_overs=0, passed_speed_ticks=0, tot_fuel=0, tot_cost=0;
 volatile uint16_t last_inj_ticks=0, rpm_ticks=0, clock_ticks=0;
 bool is12h;
 uint8_t seconds, minutes, hours, day, date, month, year;
 char *pmstr="PM";
-int8_t temp_out, temp_in;
+int32_t temp_out, temp_in;
 ///////////////////////////////
 
 
@@ -195,7 +199,7 @@ void error(uint8_t errcode)
 	gLCD_frame(32,24,104,32,1,false);
 	gLCD_locate(33,25);
 	printf("ERROR: %02x-%02x", prog_part, errcode);
-	for(i=0;i<50;i++) _delay_ms(50);
+	for(i=0;i<20;i++) _delay_ms(50);
 	gLCD_cls();
 	if(modestate==MODE_MAIN)
 	{
@@ -205,13 +209,48 @@ void error(uint8_t errcode)
 }
 
 
+void ac_send_cmd(uint8_t ac_cmd)
+{
+	uint8_t length=1;
+
+	twi_data_buf[0]=ac_cmd;
+	switch(ac_cmd)
+	{
+		case AC_CMD_SET_MODE: 
+		{
+			twi_data_buf[1]=(aflags&3); // first two bits contain what we need
+			length=2;
+		} break;
+	}
+	twi_write_str(TWIADDR_AC,length,true);
+	_delay_us(10);
+}
+
+
+int32_t ac_get_temp(uint8_t sensor_no)
+{
+	twi_data_buf[0]=AC_CMD_READ_TEMP;
+	twi_data_buf[1]=sensor_no;
+
+	twi_write_str(TWIADDR_AC,2,false);
+	twi_read_str(TWIADDR_AC,4,true);
+	_delay_us(10);
+	
+	return 
+		(((int32_t)twi_data_buf[0])    ) |
+		(((int32_t)twi_data_buf[1])<<8 ) |
+		(((int32_t)twi_data_buf[2])<<16) |
+		(((int32_t)twi_data_buf[3])<<24) 
+		;
+}
+
+
+
 /*
  * Do all the startup-time peripheral initializations.
  */
 static void xarias_init(void)
 {
-	uint8_t byteA, byteB, byteC;
-
 	prog_part = PROGPART_INIT;
 
 	gLCD_switchon();
@@ -220,30 +259,20 @@ static void xarias_init(void)
 	 */
 	twi_init();
 
+        TWAR = TWIADDR_MAINBOARD & 0xFE;
 
 	ds1803_write(0,contrast);
 	ds1803_write(1,brightness);
 
 
-	twi_start();
-
-	/*
-	 * Sending device address 1101 000 of DS1307 chip
-	 */
-	twi_write_addr(TWIADDR_DS1307);
-
-	
 	/*
 	 * First we should check if there was lack of power and ds1307 memory was erased.
 	 * Writing address start 08h - the beginning of data memory.
 	 * The check is simple: sum of two first bytes should give us third byte
 	 */
-	twi_write_data(0x08);
-	twi_start(); // repeated start
-	twi_read_addr(TWIADDR_DS1307);
-	twi_read_data(&byteA,false);
-	twi_read_data(&byteB,false);
-	twi_read_data(&byteC,true);
+	twi_data_buf[0] = 0x08;
+	twi_write_str(TWIADDR_DS1307,1,false); // sending start address to read from
+	twi_read_str(TWIADDR_DS1307,3,false);
 	/*
 	 * DS1307 memory map:
 	 * 	0x08-0x0A : control byte (sum of two previous bytes)
@@ -254,7 +283,7 @@ static void xarias_init(void)
 	 *	0x11-0x12 : fuel cost
 	 *	0x13      : desired A/C temperature
 	 */
-	if((uint8_t)(byteA+byteB)!=byteC || (!byteA && !byteB) )
+	if((uint8_t)(twi_data_buf[0]+twi_data_buf[1])!=twi_data_buf[2] || (!twi_data_buf[0] && !twi_data_buf[1]) )
 	{
 		/*
 		 * First turn on LCD
@@ -262,83 +291,102 @@ static void xarias_init(void)
 		ds1803_write(0, contrast);
 		ds1803_write(1, brightness);
 
+
 		/*
 		 * If condition is not met than we should initialize clock and additional bytes
 		 */
-		twi_start();
-		twi_write_addr(TWIADDR_DS1307);
-		twi_write_data(0x00);
+		ds1307_write_time(1,1,true,"  ",1,1,1,1);
+		ds1307_write_ctrl();
+
+
+		srandom(twi_data_buf[0]+twi_data_buf[1]+twi_data_buf[2]);
+		do{
+			twi_data_buf[0]=(uint8_t)random();
+		}while(!twi_data_buf[0]);
+		do{
+			twi_data_buf[1]=(uint8_t)random();
+		}while(!twi_data_buf[1]);
+		twi_data_buf[2]=twi_data_buf[0]+twi_data_buf[1];
 
 		/*
-		 * Writing time registers
-		 * Important to enable CH bit in register 0
+		 * First byte should contain address to start from
 		 */
-		twi_write_data(51); 
-		twi_write_data(1);
-		twi_write_data(1);
-		twi_write_data(1);
-		twi_write_data(1);
-		twi_write_data(1);
-		twi_write_data(1);
-	
-		/*
-		 * writing control register
-		 * setting 32,768 kHz (bits 0 and 1)
-		 */
-		twi_write_data(_BV(4)|_BV(0)|_BV(1));
-
-		srandom(byteA+byteB+byteC);
-		do{
-			byteA=(uint8_t)random();
-		}while(!byteA);
-		do{
-			byteB=(uint8_t)random();
-		}while(!byteB);
-		byteC=byteA+byteB;
-		twi_write_data(byteA);
-		twi_write_data(byteB);
-		twi_write_data(byteC);
+		twi_data_buf[3]=twi_data_buf[2];
+		twi_data_buf[2]=twi_data_buf[1];
+		twi_data_buf[1]=twi_data_buf[0];
+		twi_data_buf[0]=0x08;
 		/*
 		 * Writeing all the variables that should be saved
 		 */
-		twi_write_data(contrast);
-		twi_write_data(brightness);
-		twi_write_data(((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0));
-		twi_write_data(currency[0]);
-		twi_write_data(currency[1]);
-		twi_write_data(currency[2]);
-		twi_write_data((uint8_t)(fuel_cost>>8));
-		twi_write_data((uint8_t)(fuel_cost));
-		twi_write_data(temp_ac);
-		twi_stop();
+		twi_data_buf[4]  = (contrast);
+		twi_data_buf[5]  = (brightness);
+		twi_data_buf[6]  = (((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0));
+		twi_data_buf[7]  = (currency[0]);
+		twi_data_buf[8]  = (currency[1]);
+		twi_data_buf[9]  = (currency[2]);
+		twi_data_buf[10]  = ((uint8_t)(fuel_cost>>8));
+		twi_data_buf[11] = ((uint8_t)(fuel_cost));
+		twi_data_buf[12] = (temp_ac);
+
+		twi_write_str(TWIADDR_DS1307,13,true);
+
 	}	
 	else 
 	{
-		uint8_t tmpdata;
-		twi_start();
+		/*
+		 * Reading existing data and restore settings
+		 */
+
+
+		twi_read_str(TWIADDR_DS1307,9,true);
+
+		contrast    	= twi_data_buf[0];
+		brightness  	= twi_data_buf[1];
+		is_km 		= twi_data_buf[2] & _BV(0);
+		is_litres	= twi_data_buf[2] & _BV(1);
+		if(twi_data_buf[2] & _BV(2)) 
+		{  	// set auto
+			AFLAGS_SET(FLAG_AC_MODE);
+		}
+		else
+		{	// set manual
+			AFLAGS_UNSET(FLAG_AC_MODE);
+		}
+		currency[0] 	= (char)twi_data_buf[3];
+		currency[1] 	= (char)twi_data_buf[4];
+		currency[2] 	= twi_data_buf[5];
+		fuel_cost 	= (uint16_t) (twi_data_buf[6]) << 8;
+		fuel_cost      += twi_data_buf[7];
+		temp_ac 	= twi_data_buf[8];
+
+/*		twi_start();
 		twi_read_addr(TWIADDR_DS1307);
-		twi_read_data(&contrast,false);
-		twi_read_data(&brightness,false);
-		twi_read_data(&tmpdata,false);
+		twi_read_byte(&contrast,false);
+		twi_read_byte(&brightness,false);
+		twi_read_byte(&tmpdata,false);
 		is_km=tmpdata&_BV(0);
 		is_litres=tmpdata&_BV(1);
 		if(tmpdata&_BV(2))
 			AFLAGS_SET(FLAG_AC_MODE);
 		else
 			AFLAGS_UNSET(FLAG_AC_MODE);
-		twi_read_data((uint8_t *)currency,    false);
-		twi_read_data((uint8_t *)(currency+1),false);
-		twi_read_data((uint8_t *)(currency+2),false);
-		twi_read_data(&tmpdata,false);
+		twi_read_byte((uint8_t *)currency,    false);
+		twi_read_byte((uint8_t *)(currency+1),false);
+		twi_read_byte((uint8_t *)(currency+2),false);
+		twi_read_byte(&tmpdata,false);
 		fuel_cost=(uint16_t)tmpdata<<8;
-		twi_read_data(&tmpdata,false);
+		twi_read_byte(&tmpdata,false);
 		fuel_cost+=tmpdata;
-		twi_read_data(&temp_ac,true);
+		twi_read_byte(&temp_ac,true);
+*/
 		ds1803_write(0,contrast);
 		ds1803_write(1,brightness);
 	}
 
-	_delay_us(10);
+	/*
+	 * In both cases AC should be initially turned off 
+	 */
+	ac_send_cmd(AC_CMD_SET_MODE);
 
 
 	/*
@@ -422,7 +470,16 @@ uint16_t calc_fuel_h(uint64_t l_inj_ticks, uint32_t l_seconds)
 
 uint16_t calc_fuel_100(uint16_t l_fuel_h, uint64_t l_speed_ticks, uint32_t l_seconds)
 {
-	return (uint16_t)(((uint64_t)l_fuel_h*SPEED_TICKS*l_seconds)/(l_speed_ticks*36));
+	/*
+	 * If the distance we've passed is not too big we will get very big fuel consumption and 
+	 * returned value will exceed 16 bits length integer. 
+	 */
+	uint64_t fuel_100=(((uint64_t)l_fuel_h*SPEED_TICKS*l_seconds)/(l_speed_ticks*36));
+
+	if(fuel_100>65535)
+		return 0;
+	else
+		return (uint16_t)fuel_100; 
 }
 
 uint32_t calc_fuel_total(uint64_t l_inj_ticks)
@@ -534,16 +591,6 @@ void draw_frame01()
 	gLCD_line(44,46,44,63,true);
 }
 
-bool aaa(bool a)
-{
-	//if(AFLAGS_ISSET(FLAG_AC_MODE))
-	//if(is_km)
-	//	a=false;
-	
-	//AFLAGS_SET(FLAG_AC_MODE);
-//	is_km=true;
-	return a;
-}
 
 
 void draw_acinfo()
@@ -578,15 +625,18 @@ void draw_acinfo()
 	/*
 	 * Inside/Outside temperature
 	 */
+	temp_out = ac_get_temp(AC_TEMP_OUT_AVG);
+	temp_in  = ac_get_temp(AC_TEMP_IN_AVG);
+	
 	gLCD_locate(103,29);
 	printf("In");
 	gLCD_locate(91,37);
-	printf("%3u^%c",temp_in,'C');
+	printf("%3d^%c",temp_in,'C');
 	gLCD_line(89,45,127,45,true);
 	gLCD_locate(103,47);
 	printf("Out");
 	gLCD_locate(91,55);
-	printf("%3u^%c",temp_out,'C');
+	printf("%3d^%c",temp_out,'C');
 }
 
 void draw_clock()
@@ -709,10 +759,12 @@ int main()
 					if(AFLAGS_ISSET(FLAG_AC_ONOFF)) 
 					{
 						AFLAGS_UNSET(FLAG_AC_ONOFF);
+						ac_send_cmd(AC_CMD_SET_MODE);
 					}
 					else 
 					{
 						AFLAGS_SET(FLAG_AC_ONOFF);
+						ac_send_cmd(AC_CMD_SET_MODE);
 					}
 
 					draw_acinfo();
@@ -727,34 +779,37 @@ int main()
 					if(AFLAGS_ISSET(FLAG_AC_MODE)) 
 					{
 						AFLAGS_UNSET(FLAG_AC_MODE);
+						ac_send_cmd(AC_CMD_SET_MODE);
 					}
 					else 
 					{
 						AFLAGS_SET(FLAG_AC_MODE);
+						ac_send_cmd(AC_CMD_SET_MODE);
 					}
+					/*
 					twi_start();
 					twi_write_addr(TWIADDR_DS1307);
-					twi_write_data(0x0D);
-					twi_write_data(((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0));
+					twi_write_byte(0x0D);
+					twi_write_byte(((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0));
 					twi_stop();	
+					*/
 					
+					twi_data_buf[0] = 0x0D;
+					twi_data_buf[1] = ((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0);
+					twi_write_str(TWIADDR_DS1307, 2, true );
+
 					draw_acinfo();
 				}
 
-				/*
-				 * AirCon temperature control
-				 */
-				#define TEMP_MIN 5
-				#define TEMP_MAX 35
-				if(AFLAGS_ISSET(FLAG_AC_MODE) && temp_ac>=TEMP_MIN && temp_ac<=TEMP_MAX)
+				if(AFLAGS_ISSET(FLAG_AC_MODE) && temp_ac>=AC_TEMP_MIN && temp_ac<=AC_TEMP_MAX)
 				{
 					inc=0;
-					if(temp_ac<TEMP_MAX)
+					if(temp_ac<AC_TEMP_MAX)
 					{
 						if(KB_UP==1) inc=1;
 						if(KB_UP==REPEAT_STROKES) { inc=1; }
 					}
-					if(temp_ac>TEMP_MIN)
+					if(temp_ac>AC_TEMP_MIN)
 					{
 						if(KB_DOWN==1) inc=-1;
 						if(KB_DOWN==REPEAT_STROKES) { inc=-1;  }
@@ -762,12 +817,19 @@ int main()
 					if(inc)
 					{
 						temp_ac+=inc;
+
+						/*
 						twi_start();
 						twi_write_addr(TWIADDR_DS1307);
-						twi_write_data(0x13);
-						twi_write_data(temp_ac);
+						twi_write_byte(0x13);
+						twi_write_byte(temp_ac);
 						twi_stop();	
+						*/
 						
+						twi_data_buf[0] = 0x13;
+						twi_data_buf[1] = temp_ac;
+						twi_write_str(TWIADDR_DS1307, 2, true);
+
 						draw_acinfo();
 					}
 				}
@@ -807,12 +869,20 @@ int main()
 			{
 				if(KB_ESC==1) 
 				{
+					/*
 					twi_start();
 					twi_write_addr(TWIADDR_DS1307);
-					twi_write_data(11);
-					twi_write_data(contrast);
-					twi_write_data(brightness);
+					twi_write_byte(11);
+					twi_write_byte(contrast);
+					twi_write_byte(brightness);
 					twi_stop();
+					*/
+						
+					twi_data_buf[0] = 0x0B;
+					twi_data_buf[1] = contrast;
+					twi_data_buf[2] = brightness;
+					twi_write_str(TWIADDR_DS1307, 3, true);
+
 
 					set_mode(MODE_MENU);
 				}
@@ -922,6 +992,19 @@ int main()
 								printf("%7s",(is_litres?"litres":"gallons"));
 							}
 						} break;
+						case 4:
+						{
+							if(KB_OK==1)
+							{
+								passed_seconds     = 0;
+								last_inj_ticks     = 0;
+								passed_inj_ticks   = 0;
+								last_inj_ticks     = 0;
+								passed_speed_ticks = 0;
+
+								ds1307_write_ctrl();
+							}
+						} break;
 					}
 
 
@@ -935,16 +1018,29 @@ int main()
 						/*
 						 * Saving all variables
 						 */
-						twi_start();
+						
+						/*twi_start();
 						twi_write_addr(TWIADDR_DS1307);
-						twi_write_data(0x0D);
-						twi_write_data(((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0));
-						twi_write_data(currency[0]);
-						twi_write_data(currency[1]);
-						twi_write_data(currency[2]);
-						twi_write_data((uint8_t)(fuel_cost>>8));
-						twi_write_data((uint8_t)(fuel_cost));
+						twi_write_byte(0x0D);
+						twi_write_byte(((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0));
+						twi_write_byte(currency[0]);
+						twi_write_byte(currency[1]);
+						twi_write_byte(currency[2]);
+						twi_write_byte((uint8_t)(fuel_cost>>8));
+						twi_write_byte((uint8_t)(fuel_cost));
 						twi_stop();
+						*/
+
+
+	                                        twi_data_buf[0] = 0x0D;
+	                                        twi_data_buf[1] = ((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0);
+	                                        twi_data_buf[2] = currency[0];
+	                                        twi_data_buf[3] = currency[1];
+	                                        twi_data_buf[4] = currency[2];
+	                                        twi_data_buf[5] = (uint8_t)(fuel_cost>>8);
+	                                        twi_data_buf[6] = (uint8_t)(fuel_cost);
+	                                        twi_write_str(TWIADDR_DS1307, 7, true);
+
 					}
 					
 					if(KB_UP==1)
@@ -1400,7 +1496,7 @@ int main()
 
 				case MODE_SERVICE:
 				{
-		/*
+				/*
 					gLCD_locate(0,40);
 					printf("Inject  Speed   RPM");
 					gLCD_locate(0,50);
@@ -1433,10 +1529,47 @@ int main()
 
 
 					ds1307_read_time(&seconds, &minutes, &is12h, pmstr, &hours, &day, &date, &month, &year);
-					gLCD_locate(0,33);
+					gLCD_locate(0,32);
 					printf("%02u-%02u-%02u  %u", date, month, year, day);
-					gLCD_locate(0,42);
+					gLCD_locate(0,40);
 					printf("%02u%s:%02u:%02u  %u", hours, (is12h?pmstr:""),minutes, seconds, (uint8_t)is12h );
+
+
+					//-----------------
+					twi_data_buf[0]=AC_CMD_SEARCH_1W_DEVS;
+					twi_write_str(TWIADDR_AC,1,false);
+					twi_read_str(TWIADDR_AC,17,true);
+
+					gLCD_locate(120,48);
+					printf("%u  ",twi_data_buf[0]);
+
+					gLCD_locate(0,48);
+					printf("1:%02x%02x%02x%02x%02x%02x%02x%02x",
+							twi_data_buf[8],
+							twi_data_buf[7],
+							twi_data_buf[6],
+							twi_data_buf[5],
+							twi_data_buf[4],
+							twi_data_buf[3],
+							twi_data_buf[2],
+							twi_data_buf[1]);
+ 					gLCD_locate(0,56);
+					printf("2:%02x%02x%02x%02x%02x%02x%02x%02x",
+							twi_data_buf[16],
+							twi_data_buf[15],
+							twi_data_buf[14],
+							twi_data_buf[13],
+							twi_data_buf[12],
+							twi_data_buf[11],
+							twi_data_buf[10],
+							twi_data_buf[9]);
+					temp_out=ac_get_temp(AC_TEMP_OUT_AVG);
+					temp_in=ac_get_temp(AC_TEMP_IN_AVG);
+					gLCD_locate(80,32);
+					printf("%6ld   ",temp_out);
+					gLCD_locate(80,40);
+					printf("%6ld   ",temp_in);
+
  
 				} break;
 
@@ -1468,6 +1601,7 @@ SIGNAL(SIG_INTERRUPT0)
 		rpm_ticks=TCNT1;
 		TCNT1=0;
 	
+		debug_seconds++;
 		/*
 		 * we do calculations only if engine is running
 		 */
