@@ -22,7 +22,8 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
-#include "xarias_b02.h"
+#include "xarias_ac.h"
+#include "xarias_b02.h" // needed only to read TWIADDR_AC constant
 
 #include <util/twi.h>
 #include <stdbool.h>
@@ -42,6 +43,7 @@
 #define MAX_RET_VALS_CNT	(8 * ONEW_MAX_DEVICE_COUNT + 1)
 
 int16_t temp[ONEW_MAX_DEVICE_COUNT+2]={0}; // two extra virtual sensors
+int16_t ac_desired_temp;
 uint8_t ac_mode = 0; // manual, off
 
 void xarias_ac_init()
@@ -105,6 +107,7 @@ void xarias_ac_init()
 	// Setting relay (6) and AC (7) pins as output
 	DDRD |= _BV(6) | _BV(7);
 
+	onew_search_addresses();
 }
 
 void ac_set_mode(volatile uint8_t new_ac_mode)
@@ -139,6 +142,17 @@ void ac_set_mode(volatile uint8_t new_ac_mode)
 	}
 
 }
+
+int32_t inline decimal_celsius_to_fahrenheit(int32_t temp_c)
+{
+	return ((temp_c*9)/5 + 320000);
+}
+
+int32_t inline decimal_fahrenheit_to_celsius(int32_t temp_f)
+{
+	return ((temp_f-320000)*5/9);
+}
+
 
 int main()
 {
@@ -177,12 +191,14 @@ SIGNAL(SIG_2WIRE_SERIAL)
 			if(!byte_no) cmd=TWDR; // first byte is always command
 			else params[byte_no-1]=TWDR;
 
-			if(cmd==AC_CMD_READ_TEMP && byte_no==1)
+			if(cmd==AC_CMD_READ_TEMP && byte_no==2)
 			{
 				temperature=temp[params[0]];
 				temperature=ds18b20_temp_to_decimal((int16_t)temperature);
-				temperature=ds18b20_temp_from_decimal(temperature);
-				temperature=ds18b20_temp_to_decimal((int16_t)temperature);
+				if(!params[1]) // if fahrenheit
+				{
+					temperature = decimal_celsius_to_fahrenheit(temperature);
+				}
 
 				
 				for(i=0;i<4;i++)
@@ -192,9 +208,17 @@ SIGNAL(SIG_2WIRE_SERIAL)
 
 			}
 			
-			if(cmd==AC_CMD_WRITE_TEMP && byte_no==1)
+			if(cmd==AC_CMD_WRITE_TEMP && byte_no==5)
 			{
-				// ....
+				temperature = ((int32_t)params[4])<<24;
+				temperature = ((int32_t)params[3])<<16;
+				temperature = ((int32_t)params[2])<<8;
+				temperature = ((int32_t)params[1]);
+				if(!params[0]) // is fahrenheit
+				{
+					temperature=decimal_fahrenheit_to_celsius(temperature);
+				}
+				ac_desired_temp=ds18b20_temp_from_decimal(temperature);
 			}
 			
 			if(cmd==AC_CMD_SET_MODE && byte_no==1)
@@ -202,13 +226,9 @@ SIGNAL(SIG_2WIRE_SERIAL)
 				ac_set_mode(params[0]);
 			}
 
-			if(cmd==AC_CMD_SEARCH_1W_DEVS)
+			if(cmd==AC_CMD_GET_1W_DEVS)
 			{
 				onew_search_addresses();
-				
-			//	onew_dev_num=2;
-			//	onew_dev_list[0]=0x23ef67ab06ULL;
-			//	onew_dev_list[1]=0x10ec90dd56ea13aaULL;
 				
 				ret_vals[0] = onew_dev_num;
 				for(i=0;i<onew_dev_num;i++)
