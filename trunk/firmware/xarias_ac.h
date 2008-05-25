@@ -23,10 +23,52 @@
 #define _XARIAS_AC_H_
 
 /*
- * AirCon temperature control
+ * AirCon minimum and maximum temperature in Celsius
  */
 #define AC_TEMP_MIN 5
 #define AC_TEMP_MAX 35
+
+/*
+ * The following commands are accepted through I2C bus. 
+ * Number of params o returns is given in bytes in brackets.
+ */
+#define AC_CMD_NOP	 	0x90 
+/* No operation.
+ * 	params: none
+ * 	return: none  
+ */
+#define AC_CMD_READ_TEMP 	0x91 
+/* Reading the temperature. It gets the sensor number to read and the scale
+ * in which it should be returned. If is_fahrenheit=0 it means in Celsius,
+ * otherwise in Fahrenheit. The temperature is returned as int32_t in decimal 
+ * multiplied by 10000. For example 23.65C is returned as 23650.
+ * 	params(2): sensor_no, is_celsius
+ * 	return(4): temperature in decimal (4 bytes, LMB first) 
+ */
+#define AC_CMD_WRITE_TEMP	0x92 
+/* Writing desired AC temperature. This temperature will be used when AC 
+ * is in the AUTO mode.
+ * 	params(5): is_celsius, temperature in decimal (4 bytes, LMB first) 
+ * 	return(0): none 
+ */
+#define AC_CMD_SET_MODE		0x93 
+/* Sets the AC mode. Please see mode mask bits below to learn what modes
+ * are available.
+ * 	params(1): mode_mask; 
+ * 	return(0): none 
+ */
+#define AC_CMD_GET_1W_DEVS 	0x94 
+/* This command returns all available devices on the 1-wire bus.
+ * 	params(0): none
+ * 	return(?): byte 1 - number of detected devices, than 8 bytes for each device 
+ */
+
+
+/*
+ * Mode mask bits
+ */
+#define AC_MODE			0 // 0 - Manual; 1 - Auto
+#define AC_ONOFF		1 // 0 - Off;    1 - On
 
 
 /*

@@ -62,21 +62,6 @@
 #define AC_TEMP_IN_SENSOR_2	2
 
 /*
- * The following commands are accepted through I2C bus
- */
-#define AC_CMD_NOP	 	0x90 // params: none		return: none
-#define AC_CMD_READ_TEMP 	0x91
-#define AC_CMD_WRITE_TEMP	0x92 
-#define AC_CMD_SET_MODE		0x93 // params: mode mask; 	return: none
-#define AC_CMD_SEARCH_1W_DEVS 	0x94 // params: none       	return: none 
-
-/*
- * Mode mask bits
- */
-#define AC_MODE			0 // 0 - Manual; 1 - Auto
-#define AC_ONOFF		1 // 0 - Off;    1 - On
-
-/*
  * It is assumed that pins of LCD are connected
  * to corresponding pins of MCU, e.g. 0 to 0,
  * 1 to 1, 2 to 2 etc.
@@ -116,6 +101,7 @@
 #define ERROR_NONE 			0x00
 #define ERROR_UNKNOWN_MODE 		0x01
 #define ERROR_RPM_COUNTER_OVERFLOW	0x02
+#define ERROR_OK			0x03
 
 #define ERROR_DS1307_SEC		0xB0
 #define ERROR_DS1307_MIN		0xB1

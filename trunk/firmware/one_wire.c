@@ -333,5 +333,4 @@ int16_t ds18b20_temp_from_decimal(int32_t decimal_temp)
 	return temp;
 
 }
-//		fahrenheit = ((celcius * 9) / 5) + (32 << 4);
 //		PORTB = ~(fahrenheit>>4);
