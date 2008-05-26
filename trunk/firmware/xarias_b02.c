@@ -49,13 +49,12 @@
  * For Toyota Corolla 1,3 4EFE it's 136 - 176
  * For Toyota Corolla 1,6 4AFE it's 160 - 200
  */
-#define INJ_FLOW 156
+#define INJ_FLOW 146
 
 /*
  * Number of ticks per one kilometer
  */
-//#define SPEED_TICKS 2548
-#define SPEED_TICKS 2325
+#define SPEED_TICKS 2548
 
 
 //#define KB_SET(i)   kb_state |=  _BV(i)
@@ -98,7 +97,8 @@ uint8_t modestate;
  * Allowed values: min=0 (the fastest), max=REPEAT_STROKES-1 (the slowest).
  */
 uint8_t kb_repeat_speed=0;
-#define REPEAT_STROKES 250
+//#define REPEAT_STROKES 250
+uint8_t REPEAT_STROKES=250;
 
 
 /*
@@ -158,24 +158,62 @@ uint8_t temp_ac=17;
 /*
  * All variables for calculating speed, rpm, fuel consumption, etc.
  */
-uint16_t tcnt0_overs_sec=0, speed_ticks=0, fuel_cost=420;
-uint32_t passed_inj_ticks=0, passed_inj_ticks_overruns=0;
-volatile uint32_t passed_seconds=0;
-uint32_t tcnt0_overs=0, passed_speed_ticks=0, tot_fuel=0, tot_cost=0;
-volatile uint16_t last_inj_ticks=0, rpm_ticks=0, clock_ticks=0;
+uint16_t tcnt0_overs_sec=0, fuel_cost=420;
+uint32_t tcnt0_overs=0, tot_fuel=0, tot_cost=0;
+volatile uint16_t last_inj_ticks=0, rpm_ticks=0, clock_ticks=0, speed_ticks=0;
 bool is12h;
 uint8_t seconds, minutes, hours, day, date, month, year;
 char *pmstr="PM";
 int32_t temp_out, temp_in;
+
+/*
+ * Such number of ticks gives us INJ_FLOW ml fuel consumed
+ */
+#define MAX_INJTICKS (32768*60/4)
+
+/*
+ * Two variables that shows us how much fuel wes consumed.
+ * Maximum fuel that we coul calculate is:
+ * UINT32_MAX/36=2^32/36=119304647 ml
+ */
+#define MAX_PASSED_INJ_TICKS_OVERRS (UINT32_MAX/INJ_FLOW)
+#define MAX_PASSED_INJ_TICKS_OVERRUNS (UINT32_MAX/(36*(INJ_FLOW+1)))
+uint32_t passed_inj_ticks=0, passed_inj_ticks_overruns=0;
+
+/*
+ * Passed seconds since the beginning of the trip
+ *
+ * Maximum seconds of trip duration that we can calculate is:
+ * UINT32_MAX/10=2^32/10=429496729 s
+ * It gives us 13 years, 226 days, 0 hours, 38 minutes and 49 secunds
+ * of maximum trip duration.
+ */
+#define MAX_PASSED_SECONDS (UINT32_MAX/10)
+volatile uint32_t passed_seconds=0;
+
+/*
+ * Passed distance ticks
+ *
+ * Maximum value is 2^32 meters, it means 
+ * 4 294 967 km and 296 meters.
+ */
+#define MAX_PASSED_SPEED_TICKS UINT32_MAX
+uint32_t passed_speed_ticks=0;
 ///////////////////////////////
-uint16_t m_speed_m=0, m_speed_km=0, avg_speed_m=0, avg_speed_km=0;
-uint16_t m_fuel_h=0, m_fuel_100=0, avg_fuel_h=0, avg_fuel_100=0;
-uint32_t passed_distance=0;
+
+
+uint32_t power(uint32_t x, uint8_t y)
+{
+	uint8_t i;
+	uint32_t retval=1;
+	for(i=0;i<y;i++,retval*=x);
+	return retval;
+}
 
 /*
  * Cuts last p digits of the value
  */
-#define CUT(val,mult) ((uint16_t)((val)/power(10,(uint8_t)mult)))
+#define CUT(val,mult) ((uint16_t)(((uint32_t)val)/power(10,(uint8_t)mult)))
 
 /* 
  * The most calculations in this program made on integer values. 
@@ -198,19 +236,38 @@ uint32_t passed_distance=0;
  *
  * uint32_t gives us 4294967 km 296 m of maximium pass
  */
-#define ROUND(val,mult,prec) ((uint32_t)(val+5*power(10,(uint8_t)mult-prec-1)))
+#define ROUND(val,mult,prec) ((uint32_t)(((uint32_t)val)+5*power(10,(uint8_t)mult-prec-1)))
 
 /*
- * This macro just truncates digits after the floating point, so it
- * only left integer part before.
+ * This function truncates digits after the floating point, so it
+ * only left integer part before. Appropriate roundings are made before.
+ * For example ROUND1(31576,3,3) gives us 31, but ROUND1(31576,3,0) 
+ * gives 32.
+ *
+ * 	val 	- value
+ * 	mult	- digits after decimal point (multiplier
+ * 	prec	- precision in digits after decimal point for rounding
  */
-#define ROUND1(val,mult,prec) ((uint16_t)CUT(ROUND(val,mult,prec),mult))
+uint16_t ROUND1(uint32_t val,uint8_t mult,uint8_t prec) 
+{
+	return ((uint16_t)CUT(ROUND(val,mult,prec),mult));
+}
 
 /*
  * And the following macro truncate digits before floating point,
  * so it only left floating part with the specified precision.
+ * This function gets the same parameteres as function above, 
+ * do the same roundings, but returns digits after decimal point.
+ *
+ * ROUND2(31576,3,3) = 576
+ * ROUND2(31576,3,2) = 58
+ * ROUND2(31576,3,1) = 6
+ * ROUND2(31576,3,0) = 0
  */
-#define ROUND2(val,mult,prec) (uint16_t)(CUT(ROUND(val,mult,prec)-CUT(ROUND(val,mult,prec),mult)*power(10,(uint8_t)mult),mult-prec))
+uint16_t ROUND2(uint32_t val, uint8_t mult, uint8_t prec) 
+{
+	return (uint16_t)(CUT(ROUND(val,mult,prec)-CUT(ROUND(val,mult,prec),mult)*power(10,(uint8_t)mult),mult-prec));
+}
 
 
 
@@ -248,6 +305,7 @@ void set_mode(uint8_t mode)
 		subfunc_pos=0;
 	}
 	kb_repeat_speed=0;
+	REPEAT_STROKES=250;
 }
 
 
@@ -352,7 +410,7 @@ static void xarias_init(void)
 
 	/*
 	 * First we should check if there was lack of power and ds1307 memory was erased.
-	 * Writing address start 08h - the beginning of data memory.
+	 * Writing start address 08h - the beginning of data memory.
 	 * The check is simple: sum of two first bytes should give us third byte
 	 */
 	twi_data_buf[0] = 0x08;
@@ -401,7 +459,7 @@ static void xarias_init(void)
 		twi_data_buf[1]=twi_data_buf[0];
 		twi_data_buf[0]=0x08;
 		/*
-		 * Writeing all the variables that should be saved
+		 * Writing all the variables that should be saved
 		 */
 		twi_data_buf[4]  = (contrast);
 		twi_data_buf[5]  = (brightness);
@@ -534,55 +592,58 @@ static void xarias_init(void)
 	set_mode(MODE_MAIN);
 }
 
-//#define INJTICKS_MAX (UINT32_MAX/(SPEED_TICKS*15))
+
+
+
+
+
+
+
+
 /*
- * Such number of ticks gives us INJ_FLOW ml fuel consumed
+ * This function returns a*b/c where a could be up to UINT32_MAX.
+ * There is only restriction that (a%c)*b <= UINT32_MAX. It 
+ * implies that c*b <= UINT32_MAX
+ * The other restruction is natural: a*b/c <= UINT32_MAX and 
+ * it implies (taking into account that a could be equal to 
+ * UINT32_MAX) that b<c.
+ *
+ * So that: b<c and c*b<= UINT32_MAX
+ *
+ * We can calculate the same just by using uint64_t but uint64_t 
+ * routines are very very memory consumptive and we really don't 
+ * like it. This procedure  saves almost 5kb of FLASH ROM and 
+ * works 305us faster than sth like ((uint64_t)a)*b/c.
  */
-#define INJTICKS_MAX (32768*60)
+uint32_t divide(uint32_t a, uint32_t b, uint32_t c)
+{
+	uint32_t val=a/c;
+	return val*b+(a-val*c)*b/c;
+}
+
 
 /*
- * This function return fuel consumption in l/h * 1000
- * We assume that fuel consumption is not greater than 65.536 l/h
- * Although l_inj_ticks is uint64_t, it cannot be greater than
- * xxxxxx and 
+ * Function returns momentary fuel consumption in ml per hour.
+ *
+ * Formula:
+ * 	fc = (inj_ticks * INJ_FLOW * 60 * 4) / (32768 * seconds)
  */
-/* old
-uint16_t calc_fuel_h(uint64_t l_inj_ticks, uint32_t l_seconds)
+uint16_t calc_fuel_h()
 {
-	return (uint16_t)((l_inj_ticks*INJ_FLOW*15)/((uint64_t)2048*l_seconds));
-}
-*/
+	return ((((uint32_t)last_inj_ticks)*INJ_FLOW*15)/(2048));
 
-
-uint16_t calc_fuel_h(uint16_t l_inj_ticks)
-{
-	return ((((uint32_t)l_inj_ticks)*INJ_FLOW*15)/(2048));
-
-//	if(retval>UINT16_MAX) retval=UINT16_MAX;
-//	return (uint16_t) retval;
 }
 
 
-/* old 
-uint16_t calc_fuel_100(uint16_t l_fuel_h, uint64_t l_speed_ticks, uint32_t l_seconds)
+/*
+ * Function returns momentary fuel consumption in ml/100km
+ *
+ * Formula:
+ * 	fc = (inj_ticks * INJ_FLOW * SPEED_TICKS * 60 * 4) / (speed_ticks * 36 * 32768 * seconds)
+ */
+uint16_t calc_fuel_100()
 {
-	 * If the distance we've passed is not too big we will get very big fuel consumption and 
-	 * returned value will exceed 16 bits length integer. 
-	uint64_t fuel_100=(((uint64_t)l_fuel_h*SPEED_TICKS*l_seconds)/(l_speed_ticks*36));
-
-	if(fuel_100>65535)
-		return 0;
-	else
-		return (uint16_t)fuel_100; 
-}
-*/
-
-uint16_t calc_fuel_1002(uint16_t l_inj_ticks, uint16_t l_speed_ticks)
-{
-	return ((((uint64_t)l_inj_ticks)*INJ_FLOW*15*SPEED_TICKS)/((uint32_t)l_speed_ticks*36*2048));
-}
-uint16_t calc_fuel_100(uint16_t l_inj_ticks, uint16_t l_speed_ticks)
-{
+	/*
 	uint32_t fuel_100=0, sum;
 //	fuel_100=((((uint64_t)l_inj_ticks)*INJ_FLOW*15*SPEED_TICKS)/(((uint32_t)l_speed_ticks)*36*2048));
 
@@ -591,41 +652,73 @@ uint16_t calc_fuel_100(uint16_t l_inj_ticks, uint16_t l_speed_ticks)
 	fuel_100=sum/2048;
 	fuel_100=fuel_100*INJ_FLOW+(sum-fuel_100*2048)*INJ_FLOW/2048;
 	return fuel_100/(l_speed_ticks*36); 
+	*/
+	if(!speed_ticks) 
+		return 0; 
+	else
+		return divide(((uint32_t)last_inj_ticks)*15*SPEED_TICKS,INJ_FLOW,2048)/(((uint32_t)speed_ticks)*36);
 }
 
 
 
-/* old 
-uint32_t calc_fuel_total(uint64_t l_inj_ticks, uint64_t l_inj_ticks_overruns)
-{
-	return (uint32_t)(((l_inj_ticks+l_inj_ticks_overruns*INJTICKS_MAX)*INJ_FLOW)/(32768*60/4)UL);
-}
-*/
+/* 
+ * Function calculates overall consumed fuel in ml.
+ * Returned value could not exceed UINT32_MAX/36
+ *
+ * Formula:
+ * 	fuel = total_injtick * INJ_FLOW * 4 / (32768 * 60 * seconds)
+ */
 uint32_t calc_fuel_total()
 {
-	return passed_inj_ticks_overruns*INJ_FLOW+passed_inj_ticks*INJ_FLOW/(32768*60/4);
+	return passed_inj_ticks_overruns*INJ_FLOW+passed_inj_ticks*INJ_FLOW/(32768*15);
 }
 
 
-/* old
-uint16_t calc_speed_m(uint64_t l_speed_ticks, uint32_t l_seconds)
+/*
+ * Calculate momentary speed in m/s 
+ *
+ * Formula: 
+ * 	speed = (l_speed_ticks*1000) / (SPEED_TICKS * seconds)
+ */
+uint16_t calc_speed_m()
 {
-	return (uint16_t)(l_speed_ticks*1000/(SPEED_TICKS*l_seconds));
-}
-*/
-
-uint16_t calc_speed_m(uint16_t l_speed_ticks)
-{
-	return (uint16_t)((uint32_t)l_speed_ticks*1000/SPEED_TICKS);
+	return (uint16_t)(((uint32_t)speed_ticks)*1000/SPEED_TICKS);
 }
 
-uint32_t power(uint32_t x, uint8_t y)
+
+
+uint32_t km_to_miles(uint32_t km)
 {
-	uint8_t i;
-	uint32_t retval=1;
-	for(i=0;i<y;i++,retval*=x);
-	return retval;
+	return ((km*1000)/1609);
 }
+
+uint32_t litres_to_gallons(uint32_t l)
+{
+	return ((l*1000)/3785);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void if_draw_progressbar(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t percent)
 {
@@ -749,6 +842,11 @@ int main()
 	uint8_t kb_sth_pressed;
 	uint8_t ac_pressed=0;
 	
+	uint16_t m_speed_m=0, m_speed_km=0, avg_speed_m=0, avg_speed_km=0;
+	uint16_t m_fuel_h=0, m_fuel_100=0, avg_fuel_h=0, avg_fuel_100=0;
+	uint32_t passed_distance=0;
+
+
 
 	/*
 	 * Wait for power to stabilize
@@ -1006,7 +1104,7 @@ while(f==g)
 					{
 						case 0: // changing fuel cost
 						{
-							kb_repeat_speed=5;
+							kb_repeat_speed=1;
 							if(KB_UP==1 || KB_UP==REPEAT_STROKES)
 							{
 								fuel_cost++;
@@ -1017,6 +1115,7 @@ while(f==g)
 							}
 							gLCD_locate(68,13);
 							printf_P(PSTR("%4u.%02u"),ROUND1(fuel_cost,2,2),ROUND2(fuel_cost,2,2));
+							REPEAT_STROKES=50;
 						} break;
 						case 1: // changing currency
 						{
@@ -1045,6 +1144,7 @@ while(f==g)
 							gLCD_line(92+(subfunc_pos-1)*6,31,90+subfunc_pos*6,31,true);
 							gLCD_locate(92,23);
 							printf_P(PSTR("%3s"),currency);
+							REPEAT_STROKES=50;
 						} break;
 						case 2: // changing kilometers/miles
 						{
@@ -1108,14 +1208,16 @@ while(f==g)
 
 					}
 					
-					if(KB_UP==1)
+					if(KB_UP==1 || KB_UP==REPEAT_STROKES)
 					{
+						kb_repeat_speed=15;
 						func_pos--;
 						lcd_update=true;
 					}
 
-					if(KB_DOWN==1)
+					if(KB_DOWN==1 || KB_DOWN==REPEAT_STROKES)
 					{
+						kb_repeat_speed=15;
 						func_pos++;
 						lcd_update=true;
 					}
@@ -1365,16 +1467,31 @@ while(f==g)
 
 			if(modestate==MODE_MAIN)
 			{
-			
+				uint32_t divider=1;
+				passed_distance=divide(passed_speed_ticks,1000,SPEED_TICKS);
+	
+				m_fuel_h     = calc_fuel_h();
+				m_fuel_100   = calc_fuel_100();
+				m_speed_m    = calc_speed_m();
+				m_speed_km   = m_speed_m * 36 / 10;
+				tot_fuel     = calc_fuel_total();
+
+				while(UINT32_MAX/(3600000/divider)<tot_fuel && divider<=100000) divider*=10;
+
+				avg_fuel_h   = tot_fuel * (3600000/divider) / (passed_seconds/divider);
+				avg_fuel_100 = tot_fuel * (100000/divider) / (passed_distance/divider);
+				avg_speed_m  = passed_distance / passed_seconds;
+				avg_speed_km = passed_distance * 36 / (passed_seconds*10);
+	
 
 				if(!AFLAGS_ISSET(FLAG_IS_KM))
 				{
 					str_dist[0]='m';
 					str_dist[1]='i';
 
-					m_speed_km      = ((uint32_t)m_speed_km)*1000/1609;
-					avg_speed_km    = ((uint32_t)avg_speed_km)*1000/1609;
-					passed_distance = ((uint32_t)passed_distance)*1000/1609;
+					m_speed_km      = km_to_miles(m_speed_km);
+					avg_speed_km    = km_to_miles(avg_speed_km);
+					passed_distance = km_to_miles(passed_distance);
 					m_fuel_100      = ((uint32_t)m_fuel_100)*1609/1000;
 					avg_fuel_100    = ((uint32_t)avg_fuel_100)*1609/1000;
 
@@ -1383,12 +1500,13 @@ while(f==g)
 				{
 					str_vol='g';
 
-					tot_fuel     = ((uint32_t)tot_fuel)*1000/3785;
-					m_fuel_h     = ((uint32_t)m_fuel_h)*1000/3785;
-					avg_fuel_h   = ((uint32_t)avg_fuel_h)*1000/3785;
-					m_fuel_100   = ((uint32_t)m_fuel_100)*1000/3785;
-					avg_fuel_100 = ((uint32_t)avg_fuel_100)*1000/3785;
+					tot_fuel     = litres_to_gallons(tot_fuel);
+					m_fuel_h     = litres_to_gallons(m_fuel_h);
+					avg_fuel_h   = litres_to_gallons(avg_fuel_h);
+					m_fuel_100   = litres_to_gallons(m_fuel_100);
+					avg_fuel_100 = litres_to_gallons(avg_fuel_100);
 				}
+				tot_cost     = divide(tot_fuel, fuel_cost, 1000);
 			}
 
 
@@ -1754,12 +1872,6 @@ while(f==g)
 
 				case MODE_SERVICE:
 				{
-				/*
-					gLCD_locate(0,40);
-					printf_P(PSTR("Inject  Speed   RPM"));
-					gLCD_locate(0,50);
-					printf_P(PSTR("%5u  %5u  %5u"),last_inj_ticks,speed_ticks,rpm_ticks*20);
-*/
 					// printing speed in km/h and m/s
 					gLCD_locate(2,2);
 					printf( "%3u %s/h  %3u %s/s",m_speed_km,str_dist,m_speed_m,str_mdist);
@@ -1767,30 +1879,32 @@ while(f==g)
 	//				gLCD_echo(0,0,"-");
 			
 					// printing fuel consumption
-					gLCD_locate(0,10);
+					gLCD_locate(2,10);
 					printf( " %3u.%u l/100%s %2u.%u",ROUND1(m_fuel_100,3,1),ROUND2(m_fuel_100,3,1),str_dist,ROUND1(m_fuel_h,3,1),ROUND2(m_fuel_h,3,1));
 			
-					// temporarily: checking for error
-					if(ROUND2(m_fuel_100,3,1)>9) { gLCD_locate(0,0); printf_P(PSTR("%u"),m_fuel_100); while(1);}
-					
 					// avarage speed and fuel consumption
-					gLCD_locate(0,18);
+					gLCD_locate(2,18);
 					printf( "%3u %s/h %3u.%u %c/100",avg_speed_km,str_dist,ROUND1(avg_fuel_100,3,1),ROUND2(avg_fuel_100,3,1),str_vol);
 						
 					// printing journey time
-					gLCD_locate(0,26);
+					gLCD_locate(2,26);
 					printf_P(PSTR("%02u:%02u:%02u"), (uint8_t)(passed_seconds/3600),(uint8_t)((passed_seconds%3600)/60),(uint8_t)(passed_seconds%60));
-			
 					// printing passed dist
 					gLCD_locate(50,26);
 					printf( "%4u.%03u %s",ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3),str_dist);
 
+					gLCD_locate(2,34);
+					printf_P(PSTR("Inject  Speed   RPM"));
+					gLCD_locate(2,42);
+					printf_P(PSTR("%5u  %5u  %5u"),last_inj_ticks,speed_ticks,rpm_ticks*20);
 
+			
+					// printing time
 					ds1307_read_time(&seconds, &minutes, &is12h, pmstr, &hours, &day, &date, &month, &year);
-					gLCD_locate(0,34);
-					printf_P(PSTR("%02u-%02u-%02u  %u"), date, month, year, day);
-					gLCD_locate(0,42);
-					printf_P(PSTR("%02u%s:%02u:%02u  %u"), hours, (is12h?pmstr:""),minutes, seconds, (uint8_t)is12h );
+					gLCD_locate(2,54);
+					printf_P(PSTR("%02u-%02u-%02u"), date, month, year);
+					gLCD_locate(54,54);
+					printf_P(PSTR("%02u:%02u:%02u %3s"), hours,minutes, seconds, (is12h?pmstr:"24h"));
 
 
 
@@ -1826,42 +1940,33 @@ SIGNAL(SIG_INTERRUPT0)
 	
 		debug_seconds++;
 		/*
-		 * we do calculations only if engine is running
+		 * do calculations only if engine is running and 
+		 * we'll not exceed none of the values
 		 */
-	//	rpm_ticks=1;
-		if(rpm_ticks) 
+		if(	rpm_ticks && 
+			passed_seconds <= MAX_PASSED_SECONDS-1 &&
+			passed_inj_ticks_overruns <= MAX_PASSED_INJ_TICKS_OVERRUNS-1 && 
+			passed_speed_ticks <= MAX_PASSED_SPEED_TICKS-speed_ticks ) 
 		{
+
 			passed_seconds++;
 			last_inj_ticks=inj_ticks;
 			passed_inj_ticks += last_inj_ticks;
 			passed_speed_ticks += speed_ticks;
 
-			if(passed_inj_ticks>INJTICKS_MAX)
+			if(passed_inj_ticks>MAX_INJTICKS)
 			{
 				passed_inj_ticks_overruns++;
-				passed_inj_ticks -= INJTICKS_MAX;
+				passed_inj_ticks -= MAX_INJTICKS;
 			}
-			passed_distance=passed_speed_ticks*1000/SPEED_TICKS;
-	
-			m_fuel_h     = calc_fuel_h(last_inj_ticks);
-			m_fuel_100   = calc_fuel_100(last_inj_ticks,speed_ticks);
-			m_speed_m    = calc_speed_m(speed_ticks);
-			m_speed_km   = m_speed_m * 36 / 10;
-			tot_fuel     = calc_fuel_total();
-			tot_cost     = tot_fuel * fuel_cost / 1000;
-
-			avg_fuel_h   = tot_fuel * 3600000 / passed_seconds;
-			avg_fuel_100 = tot_fuel * 100000 / passed_distance;
-			avg_speed_m  = passed_distance / passed_seconds;
-			avg_speed_km = passed_distance * 36 / (passed_seconds*10);
 		}
 		else
 		{
 			last_inj_ticks 	= 0;
-			m_fuel_h	= 0;
-			m_fuel_100	= 0;
-			m_speed_m	= 0;
-			m_speed_km	= 0;
+		//	m_fuel_h	= 0;
+		//	m_fuel_100	= 0;
+		//	m_speed_m	= 0;
+		//	m_speed_km	= 0;
 		}
 		inj_ticks=0;
 	
