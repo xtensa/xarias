@@ -29,6 +29,7 @@
 #include "gLCD.h"
 #endif
 
+
 extern volatile uint8_t debug_seconds;
 
 #define VAL_TO_DS1307(x) x=(((x)/10)<<4)|((x)-(x)/10*10)

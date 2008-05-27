@@ -34,8 +34,10 @@
  */
 #define ONEW_MAX_DEVICE_COUNT	3
 
+#define MAX_1WIRE_TRIES		10
 
-uint64_t onew_dev_list[ONEW_MAX_DEVICE_COUNT];
+uint8_t onew_calc_crc(uint8_t *p, uint8_t len);
+uint8_t onew_dev_list[ONEW_MAX_DEVICE_COUNT][8];
 uint8_t onew_dev_num;
 
 void onew_search_addresses();

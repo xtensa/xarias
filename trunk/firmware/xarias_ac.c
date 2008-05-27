@@ -34,20 +34,24 @@
 #define MODE_AUTO 	1
 
 #define TURN_RELAY_ON() PORTD |= _BV(6)
-#define TURN_RELAY_OFF() PORTD &= ~_BV(6)
+#define TURN_RELAY_OFF() TURN_BLOWER_OFF(); PORTD &= ~_BV(6)
 
 #define TURN_AC_ON() PORTD |= _BV(7)
 #define TURN_AC_OFF() PORTD &= ~_BV(7)
+#define TURN_BLOWER_OFF() OCR2=0
 
-#define MAX_PARAMS_CNT 		3
+#define MAX_PARAMS_CNT 		8
 #define MAX_RET_VALS_CNT	(8 * ONEW_MAX_DEVICE_COUNT + 1)
 
+
 int16_t temp[ONEW_MAX_DEVICE_COUNT+2]={0}; // two extra virtual sensors
-int16_t ac_desired_temp;
+volatile int16_t ac_desired_temp = 35;
 uint8_t ac_mode = 0; // manual, off
 
 void xarias_ac_init()
 {
+	bool crc_ok;
+
         /*
 	 * Enable external interrupt 0
 	 */
@@ -107,7 +111,17 @@ void xarias_ac_init()
 	// Setting relay (6) and AC (7) pins as output
 	DDRD |= _BV(6) | _BV(7);
 
-	onew_search_addresses();
+	uint8_t try=0;
+
+	do {
+		uint8_t k;
+		crc_ok = true;
+		onew_search_addresses();
+		for(k=0;k<onew_dev_num;k++)
+			if(onew_dev_list[k][7] != onew_calc_crc(onew_dev_list[k],7) )
+				crc_ok = false;
+		try++;
+	} while (!crc_ok && try<MAX_1WIRE_TRIES);
 }
 
 void ac_set_mode(volatile uint8_t new_ac_mode)
@@ -153,15 +167,40 @@ int32_t inline decimal_fahrenheit_to_celsius(int32_t temp_f)
 	return ((temp_f-320000)*5/9);
 }
 
+/*
+ * Setting blower power in percentage
+ */
+void ac_set_blower_power(uint8_t power)
+{
+	#define AC_BLOWER_PMAX	0 // FIXME
+	#define AC_BLOWER_PMIN	0 // FIXME
+	if(power > 100) power=100;
+
+	OCR2=(AC_BLOWER_PMAX-AC_BLOWER_PMIN)*power/100+AC_BLOWER_PMIN;
+}
+
+void ac_control_auto()
+{
+	#define AC_DELTA_BOTTOM	3
+	#define AC_DELTA_UP	2
+	if( (ac_mode & (_BV(AC_MODE)|_BV(AC_ONOFF)) ) == (_BV(AC_MODE)|_BV(AC_ONOFF)) )
+	{
+		if(temp[AC_TEMP_IN_AVG] > ac_desired_temp+_BV(4)-AC_DELTA_UP)
+		{
+			TURN_AC_ON();
+		}
+		if(temp[AC_TEMP_IN_AVG] < ac_desired_temp+AC_DELTA_BOTTOM)
+		{
+			TURN_AC_OFF();
+		}
+	}
+}
 
 int main()
 {
-
-	uint8_t cmp=255;
-
 	xarias_ac_init();
-
-	OCR2=cmp;
+	
+	TURN_BLOWER_OFF();
 
 	DDRB |= 1;
 	PORTB &= ~1;
@@ -194,7 +233,9 @@ SIGNAL(SIG_2WIRE_SERIAL)
 			if(cmd==AC_CMD_READ_TEMP && byte_no==2)
 			{
 				temperature=temp[params[0]];
+				
 				temperature=ds18b20_temp_to_decimal((int16_t)temperature);
+				
 				if(!params[1]) // if fahrenheit
 				{
 					temperature = decimal_celsius_to_fahrenheit(temperature);
@@ -210,10 +251,10 @@ SIGNAL(SIG_2WIRE_SERIAL)
 			
 			if(cmd==AC_CMD_WRITE_TEMP && byte_no==5)
 			{
-				temperature = ((int32_t)params[4])<<24;
-				temperature = ((int32_t)params[3])<<16;
-				temperature = ((int32_t)params[2])<<8;
-				temperature = ((int32_t)params[1]);
+				temperature  = ((int32_t)params[4])<<24;
+				temperature |= ((int32_t)params[3])<<16;
+				temperature |= ((int32_t)params[2])<<8;
+				temperature |= ((int32_t)params[1]);
 				if(!params[0]) // is fahrenheit
 				{
 					temperature=decimal_fahrenheit_to_celsius(temperature);
@@ -228,14 +269,14 @@ SIGNAL(SIG_2WIRE_SERIAL)
 
 			if(cmd==AC_CMD_GET_1W_DEVS)
 			{
-				onew_search_addresses();
+				//onew_search_addresses();
 				
 				ret_vals[0] = onew_dev_num;
 				for(i=0;i<onew_dev_num;i++)
 				{
 					for(j=0;j<8;j++)
 					{
-						ret_vals[i*8+j+1] = (uint8_t)((onew_dev_list[i] >> (8*j))&0xff);
+						ret_vals[i*8+j+1] = onew_dev_list[i][j];
 					}
 				}
 				ret_vals_cnt = onew_dev_num*8+1;
@@ -290,6 +331,8 @@ SIGNAL(SIG_INTERRUPT0)
 		 */
 		temp[3]=temp[0];
 		temp[4]=temp[1];
+
+		ac_control_auto();
 	}
 
 	clock_ticks++;

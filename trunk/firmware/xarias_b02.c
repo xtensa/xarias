@@ -80,6 +80,7 @@ char mainmenu_strings[6][19]={	"Trip settings",
 #define MODE_MENU		0x06
 #define MODE_FUEL		0x07
 #define MODE_SPEED		0x08
+#define MODE_RPM		0x09
 
 #define MODE_SENSORS_INFO	0xF0
 uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED;
@@ -294,7 +295,7 @@ void set_mode(uint8_t mode)
 	mode_changed=true;
 	lcd_update=true;
 	gLCD_cls();
-	if(mode==MODE_SPEED || mode==MODE_TRIP || mode==MODE_FUEL)
+	if(mode==MODE_SPEED || mode==MODE_TRIP || mode==MODE_FUEL || mode==MODE_RPM)
 	{
 		MODE_MAIN=mode;
 		draw_frame01();
@@ -352,9 +353,11 @@ void ac_send_cmd(uint8_t ac_cmd)
 		{
 			int32_t t=((int32_t)temp_ac)*10000;
 			twi_data_buf[1] = 1; // temp_ac is always in Celsius
-			twi_data_buf[2] = (((int32_t)t)>>8)&0xFF;
-			twi_data_buf[3] = (((int32_t)t)>>16)&0xFF;
-			twi_data_buf[4] = (((int32_t)t)>>24)&0xFF;
+			twi_data_buf[2] = (uint8_t)(t&0xFF);
+			twi_data_buf[3] = (uint8_t)((t>>8)&0xFF);
+			twi_data_buf[4] = (uint8_t)((t>>16)&0xFF);
+			twi_data_buf[5] = (uint8_t)((t>>24)&0xFF);
+			length=6;
 		} break;
 	}
 	twi_write_str(TWIADDR_AC,length,true);
@@ -804,8 +807,8 @@ void draw_acinfo()
 	/*
 	 * Inside/Outside temperature
 	 */
-	temp_out = ac_get_temp(AC_TEMP_OUT_AVG);
 	temp_in  = ac_get_temp(AC_TEMP_IN_AVG);
+	temp_out = ac_get_temp(AC_TEMP_OUT_AVG);
 	
 	gLCD_locate(103,29);
 	printf_P(PSTR("In"));
@@ -929,6 +932,7 @@ while(f==g)
 			case MODE_TRIP:
 			case MODE_FUEL:
 			case MODE_SPEED:
+			case MODE_RPM:
 			{
 				if(KB_OK) 
 				{ 
@@ -949,14 +953,13 @@ while(f==g)
 				}
 				if(KB_FUNC4==1) 
 				{
-					gLCD_switchon();
-					set_mode(MODE_MAIN);
-					ds1803_write(0,contrast);
-					ds1803_write(1,brightness);
+					set_mode(MODE_RPM);
 				}
 				if(KB_FUNC5==1) 
 				{
-					gLCD_switchoff();
+					//gLCD_switchon();
+					//gLCD_switchoff();
+					//set_mode(MODE_MAIN);
 				}
 				
 				if(KB_FUNC6==1) ac_pressed=1;
@@ -1467,7 +1470,7 @@ while(f==g)
 
 			if(modestate==MODE_MAIN)
 			{
-				uint32_t divider=1;
+				uint32_t divisor=1;
 				passed_distance=divide(passed_speed_ticks,1000,SPEED_TICKS);
 	
 				m_fuel_h     = calc_fuel_h();
@@ -1476,12 +1479,15 @@ while(f==g)
 				m_speed_km   = m_speed_m * 36 / 10;
 				tot_fuel     = calc_fuel_total();
 
-				while(UINT32_MAX/(3600000/divider)<tot_fuel && divider<=100000) divider*=10;
+				while(UINT32_MAX/(3600000/divisor)<tot_fuel && divisor<=100000) divisor*=10;
 
-				avg_fuel_h   = tot_fuel * (3600000/divider) / (passed_seconds/divider);
-				avg_fuel_100 = tot_fuel * (100000/divider) / (passed_distance/divider);
-				avg_speed_m  = passed_distance / passed_seconds;
-				avg_speed_km = passed_distance * 36 / (passed_seconds*10);
+				if(passed_seconds)
+				{
+					avg_fuel_h   = tot_fuel * (3600000/divisor) / (passed_seconds/divisor);
+					avg_fuel_100 = tot_fuel * (100000/divisor) / (passed_distance/divisor);
+					avg_speed_m  = passed_distance / passed_seconds;
+					avg_speed_km = passed_distance * 36 / (passed_seconds*10);
+				}
 	
 
 				if(!AFLAGS_ISSET(FLAG_IS_KM))
@@ -1546,6 +1552,45 @@ while(f==g)
 					 */
 					gLCD_locate(47,2);
 					printf_P(PSTR("%3u %s/s"),m_speed_m,str_mdist);
+
+					/*
+					 * Passed distance
+					 */
+					gLCD_locate(2,37);
+					printf_P(PSTR("%s: %6u.%03u"),str_dist,ROUND1(passed_distance,3,3),ROUND2(passed_distance,3,3));
+
+					/*
+					 * Average speed
+					 */
+					gLCD_locate(2,47);
+					printf_P(PSTR("Avg SPD"));
+					gLCD_locate(14,55);
+					printf_P(PSTR("%3u"),avg_speed_km);
+
+					draw_clock();
+					draw_acinfo();
+
+				} break;
+
+			
+				case MODE_RPM:
+				{
+					gLCD_locate(2,2);
+					printf_P(PSTR("RPM"));
+
+					/*
+					 * MAIN for this mode - current RPM
+					 */
+					gLCD_locate(15,11);
+					fprintf(&gLCD_str16x24,"%3u",rpm_ticks/1000); // FIXME
+					gLCD_locate(65,28);
+					printf_P(PSTR("rpm"));
+
+					/*
+					 * Speed in m/s
+					 */
+					//gLCD_locate(47,2);
+					//printf_P(PSTR("%3u %s/s"),m_speed_m,str_mdist);
 
 					/*
 					 * Passed distance
@@ -1818,11 +1863,6 @@ while(f==g)
 						printf_P(PSTR("t: %4d.%04d^%c"),ROUND1(temp,4,4), ROUND2(temp,4,4),str_temp);
 					}
 
-				/*	temp_out=ac_get_temp(AC_TEMP_OUT_AVG);
-					temp_in=ac_get_temp(AC_TEMP_IN_AVG);
-					gLCD_locate(80,32);
-					printf_P(PSTR("%6ld   "),temp_out);
-				*/
  				} break;
 
 				case MODE_DATETIME_SETTINGS:
