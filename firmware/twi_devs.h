@@ -25,7 +25,7 @@
 /*
  * This is global variable that is used to read or write to I2C bus.
  */
-uint8_t twi_data_buf[13];
+uint8_t twi_data_buf[17];
 
 
 /*

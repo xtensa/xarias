@@ -23,6 +23,7 @@
 //#include <ctype.h>
 #include <avr/io.h>
 #include <util/delay.h>
+#include <stdbool.h>
 #include "one_wire.h"
 
 
@@ -61,7 +62,7 @@
 #define ONEW_BUS_PULL_DOWN()	PORT_UNSET(BUS_PORT)
 #define ONEW_BUS_GET_STATE()	PIN_GETSTATE(BUS_PORT)
 
-uint64_t onew_dev_list[ONEW_MAX_DEVICE_COUNT];
+uint8_t onew_dev_list[ONEW_MAX_DEVICE_COUNT][8];
 uint8_t onew_dev_num=0;
 
 
@@ -139,6 +140,37 @@ uint8_t onew_read_byte()
 	return byte;
 }
 
+
+uint8_t onew_calc_crc(uint8_t *p, uint8_t len)
+{
+	#define CRC_DIVISOR 281
+
+	uint8_t i, j;
+	uint16_t crc=0;
+
+	if(!len) return 0;
+
+	crc = p[0];
+	for(i=0;i<len;i++)
+	{
+		if(i+1<len)
+			crc |= (((uint16_t)p[i+1])<<8);
+
+		for(j=0;j<8;j++)
+		{
+			if( crc & 1)
+			{
+				crc ^= CRC_DIVISOR;
+			}
+			crc >>= 1;
+		}
+	}
+
+	return (uint8_t)(crc);
+}
+
+
+
 /*
  * 1-Wire is searched for available devices.
  * The result adresses are written to onew_dev_list table.
@@ -147,7 +179,7 @@ uint8_t onew_read_byte()
  */
 void onew_search_addresses()
 {
-	uint64_t conf_mask=0;
+	uint8_t conf_mask[8]={0};
 	uint8_t i=255, j, retcode;
 
 	for(onew_dev_num=0;onew_dev_num<ONEW_MAX_DEVICE_COUNT;onew_dev_num++)
@@ -161,7 +193,7 @@ void onew_search_addresses()
 			 */
 			for(i=63; i<64; i--)
 			{
-				if(conf_mask & ((uint64_t)1)<<i) break;
+				if(conf_mask[i/8] & (1<<(i%8))) break;
 			}
 
 			/*
@@ -178,11 +210,11 @@ void onew_search_addresses()
 			 */
 			for(j=0;j<i;j++)
 			{
-				onew_dev_list[onew_dev_num] |= (onew_dev_list[onew_dev_num-1] & ((uint64_t)1)<<j);
+				onew_dev_list[onew_dev_num][j/8] |= (onew_dev_list[onew_dev_num-1][j/8] & (1<<(j%8)));
 				
 				onew_read_bit();
 				onew_read_bit();
-				onew_write_bit(onew_dev_list[onew_dev_num]&((uint64_t)1)<<j);
+				onew_write_bit(onew_dev_list[onew_dev_num][j/8]&(1<<(j%8)));
 			}
 
 			/*
@@ -190,13 +222,13 @@ void onew_search_addresses()
 			 */
 			if(i<64)
 			{
-				onew_dev_list[onew_dev_num] &= ~(((uint64_t)1)<<i);
+				onew_dev_list[onew_dev_num][i/8] &= ~(1<<(i%8));
 				
 				onew_read_bit();
 				onew_read_bit();
 				onew_write_bit(0);
 
-				conf_mask &= ~(((uint64_t)1)<<i);
+				conf_mask[i/8] &= ~(1<<(i%8));
 			}
 
 
@@ -215,13 +247,13 @@ void onew_search_addresses()
 			}
 			if (retcode == 2) // all ones
 			{
-				onew_dev_list[onew_dev_num] |= ((uint64_t)1)<<j;
+				onew_dev_list[onew_dev_num][j/8] |= (1<<(j%8));
 				onew_write_bit(1);
 			}
 			if (!retcode) // conflict
 			{
-				conf_mask |= ((uint64_t)1)<<j;
-				onew_dev_list[onew_dev_num] |= ((uint64_t)1)<<j;
+				conf_mask[j/8] |= (1<<(j%8));
+				onew_dev_list[onew_dev_num][j/8] |= (1<<(j%8));
 				onew_write_bit(1);
 			}
 
@@ -235,9 +267,9 @@ void onew_write_addr(uint8_t dev)
 {
 	uint8_t j;
 
-	for(j=0;j<64;j++)
+	for(j=0;j<8;j++)
 	{
-		onew_write_bit((onew_dev_list[dev]&(((uint64_t)1)<<j))?1:0);
+		onew_write_byte(onew_dev_list[dev][j]);
 	}
 }
 
@@ -257,19 +289,27 @@ void ds18b20_convert_temp(uint8_t dev)
 int16_t ds18b20_read_temp(uint8_t dev) 
 {
 	uint8_t scratchpad[9];
-	uint8_t i;
-	for (i = 0; i < 9; i++) scratchpad[i] = 0;
-	onew_reset();
-	onew_write_byte(DS18B20_ROM_MATCH);
-	onew_write_addr(dev);
-	onew_write_byte(DS18B20_CMD_READ_SCRATCHPAD); 
-	for (i = 0; i < 9; i++) 
-	{
-		scratchpad[i] = onew_read_byte();
-	}
+	uint8_t  i, try=0;
+	bool crc_ok;
+
+	do {
+		crc_ok = true;
+		for (i = 0; i < 9; i++) scratchpad[i] = 0;
+		onew_reset();
+		onew_write_byte(DS18B20_ROM_MATCH);
+		onew_write_addr(dev);
+		onew_write_byte(DS18B20_CMD_READ_SCRATCHPAD); 
+		for (i = 0; i < 9; i++) 
+		{
+			scratchpad[i] = onew_read_byte();
+		}
+
+		if(scratchpad[8] != onew_calc_crc(scratchpad,8))
+			crc_ok=false;
+
+		try++;
+	} while (!crc_ok && try<MAX_1WIRE_TRIES);
 	return (((((int16_t)scratchpad[1]) << 8) | scratchpad[0]));
-//	return (((scratchpad[1] << 8) | scratchpad[0]) >>4)&0xff;
-//	return (scratchpad[1] << 8) | scratchpad[0];
 }
 
 int32_t ds18b20_temp_to_decimal(int16_t temp)
@@ -296,7 +336,7 @@ int32_t ds18b20_temp_to_decimal(int16_t temp)
 
 int16_t ds18b20_temp_from_decimal(int32_t decimal_temp)
 {
-	int32_t temp=0;
+	int16_t temp=0;
 	uint8_t is_negative=0;
 	
 	if(decimal_temp<0) 
@@ -306,7 +346,7 @@ int16_t ds18b20_temp_from_decimal(int32_t decimal_temp)
 	}
 
 	temp = (decimal_temp/10000);
-	decimal_temp -= temp*10000;
+	decimal_temp -= ((uint32_t)temp)*10000;
 	temp <<= 4;
 	
 	if(decimal_temp>=5000)
