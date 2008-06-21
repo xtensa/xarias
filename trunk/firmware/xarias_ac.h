@@ -32,7 +32,7 @@
  * The following commands are accepted through I2C bus. 
  * Number of params o returns is given in bytes in brackets.
  */
-#define AC_CMD_NOP	 	0x90 
+#define AC_CMD_NOP	 	0x90
 /* No operation.
  * 	params: none
  * 	return: none  
@@ -61,6 +61,19 @@
 /* This command returns all available devices on the 1-wire bus.
  * 	params(0): none
  * 	return(?): byte 1 - number of detected devices, than 8 bytes for each device 
+ */
+#define AC_CMD_GET_DOORS	0x95
+/*
+ * This command gets no parameters and return 1 byte - the mask of opened doors
+ * in which every bit indicates on door. 1 - is open, 0 - is closed
+ * 	params(0): none
+ * 	return(1): opened doors bitmask
+ */
+#define AC_CMD_MAKE_BEEPS	0x96
+/*
+ * This command just makes <beeps_number> beeps of tone <tone>.
+ * You can adjust duration and interval of beeps: 255 = 5 secs
+ * 	params(4): tone, beeps_number, duration, interval
  */
 
 
