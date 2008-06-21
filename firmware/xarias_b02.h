@@ -140,7 +140,8 @@ uint8_t prog_part;
  */
 #define PROGPART_MAIN 			0x01
 #define PROGPART_INIT			0x02
-#define PROGPART_DS1307_READ		0xA0
-#define PROGPART_DS1307_WRITE		0xA1
+#define PROGPART_LCD_UPDATE		0x03
+#define PROGPART_TWI_READ		0xA0
+#define PROGPART_TWI_WRITE		0xA1
 
 #endif

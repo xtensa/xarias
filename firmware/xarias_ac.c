@@ -34,34 +34,40 @@
 #define MODE_AUTO 	1
 
 #define TURN_RELAY_ON() PORTD |= _BV(6)
-#define TURN_RELAY_OFF() TURN_BLOWER_OFF(); PORTD &= ~_BV(6)
+#define TURN_RELAY_OFF() PORTD &= ~_BV(6)
 
 #define TURN_AC_ON() PORTD |= _BV(7)
 #define TURN_AC_OFF() PORTD &= ~_BV(7)
-#define TURN_BLOWER_OFF() OCR2=0
+#define TURN_BLOWER_OFF() OCR2=255
 
 #define MAX_PARAMS_CNT 		8
 #define MAX_RET_VALS_CNT	(8 * ONEW_MAX_DEVICE_COUNT + 1)
 
 
 int16_t temp[ONEW_MAX_DEVICE_COUNT+2]={0}; // two extra virtual sensors
-volatile int16_t ac_desired_temp = 35;
+volatile int16_t ac_desired_temp = 35<<4;
 uint8_t ac_mode = 0; // manual, off
+
+uint8_t beep_count=0, beep_tone=100;
+uint16_t beep_interval=0; // in clock ticks, 32768 is equal to 1 second
+uint16_t beep_duration=0; // in clock ticks, 32768 is equal to 1 second
 
 void xarias_ac_init()
 {
 	bool crc_ok;
 
         /*
-	 * Enable external interrupt 0
+	 * Enable external interrupt 0 and 1
 	 */
-	GICR = _BV(INT0);
+	GICR = _BV(INT0) | _BV(INT1);
 	/*
-	 * Falling edge will generate interrupt 0
+	 * Falling edge will generate interrupt 0 and 
+	 * any logical change will generate interrupt 1
 	 */
-	MCUCR |= _BV(1);
-	DDRD  &= ~_BV(PORT2); // set pin to input 
-	PORTD &= ~_BV(PORT2); // disable pull-up
+	MCUCR |= _BV(ISC01) | _BV(ISC10);
+	DDRD  &= ~(_BV(PORT2)|_BV(PORT3)); // set pin to input 
+	PORTD &= ~(_BV(PORT2)|_BV(PORT3)); // disable pull-up
+
 
 	sei();
 
@@ -73,8 +79,6 @@ void xarias_ac_init()
 	TWAR = TWIADDR_AC & 0xFE;
 
 	DDRC  &= ~(_BV(PORT4)|_BV(PORT5));
-	//PORTC &= ~(_BV(PORT4)|_BV(PORT5));
-	//PORTC |= _BV(PORT4)|_BV(PORT5);
 
 	/*
 	 * Enabling TWI, ack and TWI interrupt
@@ -82,9 +86,15 @@ void xarias_ac_init()
 	TWCR = _BV(TWEN) | _BV(TWIE) | _BV(TWEA);
 
 
-	// set PWM, phase correct mode
+	// set PWM for OC2, phase correct mode
 	TCCR2 |= _BV(WGM20);
 	TCCR2 &= ~_BV(WGM21);
+
+	// set PWM for OC1B, 
+	TCCR1A = _BV(COM1B1)|_BV(COM1B0) | _BV(WGM10);
+	TCCR1B = _BV(CS11);// | _BV(WGM13);
+
+	OCR1B = 255;
 
 	// Clear OC2 on Compare Match when up-counting. Set OC2 on Compare
 	// Match when downcounting.
@@ -104,12 +114,19 @@ void xarias_ac_init()
 	
 	TCCR2 |= _BV(CS20) ; // 15625 PWM freq for 8Mhz
 
-	// Setting OC2 as output
-	DDRB |= _BV(3);
+	// Setting OC2 and PB2 as output
+	DDRB |= _BV(3) | _BV(2);
 	//PORTB |= _BV(3);
 	
 	// Setting relay (6) and AC (7) pins as output
 	DDRD |= _BV(6) | _BV(7);
+
+	// Setting PB1 pin as output for main board interrupt generator
+	DDRB |= _BV(1);
+
+	//Setting keyboard pins as input
+	DDRD &= ~( _BV(0) | _BV(1));
+	DDRC &= ~( _BV(0) | _BV(1) | _BV(2) | _BV(3) );
 
 	uint8_t try=0;
 
@@ -122,13 +139,13 @@ void xarias_ac_init()
 				crc_ok = false;
 		try++;
 	} while (!crc_ok && try<MAX_1WIRE_TRIES);
+	
 }
 
 void ac_set_mode(volatile uint8_t new_ac_mode)
 {
 	ac_mode=new_ac_mode;
 	
-	PORTB |= 1;
 
 	if( ac_mode & _BV(AC_MODE) ) // AUTO 
 	{
@@ -140,11 +157,13 @@ void ac_set_mode(volatile uint8_t new_ac_mode)
 		{
 			TURN_AC_OFF();
 			TURN_RELAY_OFF();
+			TURN_BLOWER_OFF();
 		}
 	}
 	else
 	{
 		TURN_RELAY_OFF();
+		TURN_BLOWER_OFF();
 		if( ac_mode & _BV(AC_ONOFF) )
 		{
 			TURN_AC_ON();
@@ -172,38 +191,120 @@ int32_t inline decimal_fahrenheit_to_celsius(int32_t temp_f)
  */
 void ac_set_blower_power(uint8_t power)
 {
-	#define AC_BLOWER_PMAX	0 // FIXME
-	#define AC_BLOWER_PMIN	0 // FIXME
+	#define AC_BLOWER_PMAX	160 // THE SLOWEST
+	#define AC_BLOWER_PMIN	0  // THE FASTEST
 	if(power > 100) power=100;
 
-	OCR2=(AC_BLOWER_PMAX-AC_BLOWER_PMIN)*power/100+AC_BLOWER_PMIN;
+	OCR2=AC_BLOWER_PMAX-((uint16_t)(AC_BLOWER_PMAX-AC_BLOWER_PMIN))*power/100;
+//	OCR2=160;
 }
 
 void ac_control_auto()
 {
-	#define AC_DELTA_BOTTOM	3
-	#define AC_DELTA_UP	2
+	#define AC_DELTA_BOTTOM		3
+	#define AC_DELTA_UP		2
+	#define AC_MAX_BLOWER_TDELTA 	12
+	#define MAX(a,b) ((a)>(b)?(a):(b))
+	#define MIN(a,b) ((a)<(b)?(a):(b))
+
 	if( (ac_mode & (_BV(AC_MODE)|_BV(AC_ONOFF)) ) == (_BV(AC_MODE)|_BV(AC_ONOFF)) )
 	{
 		if(temp[AC_TEMP_IN_AVG] > ac_desired_temp+_BV(4)-AC_DELTA_UP)
 		{
+			ac_set_blower_power(
+				(MIN(temp[AC_TEMP_IN_AVG]-ac_desired_temp,AC_MAX_BLOWER_TDELTA<<4)*100)
+				/ ((AC_MAX_BLOWER_TDELTA<<4)));
 			TURN_AC_ON();
 		}
 		if(temp[AC_TEMP_IN_AVG] < ac_desired_temp+AC_DELTA_BOTTOM)
 		{
+			ac_set_blower_power(0);
 			TURN_AC_OFF();
 		}
+	}
+	else
+	{
+		TURN_BLOWER_OFF();
+	}
+
+}
+
+int8_t get_doors_state()
+{
+	uint8_t doors_state=0,i;
+
+	#define DOOR_COUNT	6
+	for(i=0;i<DOOR_COUNT;i++)
+	{
+		switch(i)
+		{
+			case 0:
+			{
+				doors_state |= ( (PIND&_BV(1)) ? 0 : 1 ) << 0;
+			} break;
+			case 1:
+			{
+				doors_state |= ( (PIND&_BV(0)) ? 0 : 1 ) << 1;
+			} break;
+			case 2:
+			{
+				doors_state |= ( (PINC&_BV(0)) ? 0 : 1 ) << 2;
+			} break;
+			case 3:
+			{
+				doors_state |= ( (PINC&_BV(1)) ? 0 : 1 ) << 3;
+			} break;
+			case 4:
+			{
+				doors_state |= ( (PINC&_BV(2)) ? 0 : 1 ) << 4;
+			} break;
+			case 5:
+			{
+				doors_state |= ( (PINC&_BV(3)) ? 0 : 1 ) << 5;
+			} break;
+		}
+	}
+	return doors_state;
+}
+
+
+void ac_set_beep(uint8_t beeps, uint8_t tone, uint16_t duration, uint16_t interval)
+{
+	if(!beep_count)
+	{
+		beep_count = beeps;
+		beep_tone = tone;
+		beep_duration = duration;
+		beep_interval = interval;
 	}
 }
 
 int main()
 {
-	xarias_ac_init();
-	
-	TURN_BLOWER_OFF();
+	uint8_t i;
+	/*
+	 * Wait for power to stabilize
+	 */
+	for(i=0;i<40;i++)
+	{
+		_delay_ms(10);
+	}
 
-	DDRB |= 1;
-	PORTB &= ~1;
+	xarias_ac_init();
+
+	ac_set_beep(4,1,10000,5000);
+//	cli();	
+//	DDRB |= _BV(3) | _BV(2);
+/*	while(1)
+	{
+		_delay_ms(1);
+		PORTB |= _BV(2);
+		_delay_ms(1);
+		PORTB &= ~_BV(2);
+	}
+*/
+//	DDRB |= 1;
+//	PORTB &= ~1;
 
 	return 0;
 }
@@ -260,14 +361,18 @@ SIGNAL(SIG_2WIRE_SERIAL)
 					temperature=decimal_fahrenheit_to_celsius(temperature);
 				}
 				ac_desired_temp=ds18b20_temp_from_decimal(temperature);
+				ret_vals_cnt=0;
 			}
 			
 			if(cmd==AC_CMD_SET_MODE && byte_no==1)
 			{
 				ac_set_mode(params[0]);
+				_delay_ms(30);
+				ac_control_auto();
+				ret_vals_cnt=0;
 			}
 
-			if(cmd==AC_CMD_GET_1W_DEVS)
+			if(cmd==AC_CMD_GET_1W_DEVS && byte_no==0)
 			{
 				//onew_search_addresses();
 				
@@ -280,6 +385,22 @@ SIGNAL(SIG_2WIRE_SERIAL)
 					}
 				}
 				ret_vals_cnt = onew_dev_num*8+1;
+			}
+
+			if(cmd==AC_CMD_GET_DOORS && byte_no==0)
+			{
+				ret_vals_cnt = 1;
+				ret_vals[0] = get_doors_state();
+			}
+
+			if(cmd==AC_CMD_MAKE_BEEPS && byte_no==4)
+			{
+				ac_set_beep(	params[0], 
+						params[1],
+						((uint16_t)params[2])*(32768/128),
+						((uint16_t)params[3])*(32768/128)
+						);
+				ret_vals_cnt=0;
 			}
 
 			byte_no++;
@@ -314,25 +435,56 @@ SIGNAL(SIG_2WIRE_SERIAL)
 	TWCR |= _BV(TWINT);
 }
 
+
+/*
+ * Main clock interrupt
+ */
 SIGNAL(SIG_INTERRUPT0)
 {
 	static uint16_t clock_ticks=0;
 	uint8_t i;
+	static uint16_t interval=0, duration=0;
+
+	if(beep_count)
+	{
+		if(!interval)
+		{
+			OCR1B=120;
+			duration=beep_duration;
+			interval=beep_interval;
+		}
+		else
+		{
+			if(!duration)
+			{
+				OCR1B=255;
+				if(interval) interval--;
+				if(interval==1) beep_count--;
+			}
+			else
+			{
+				duration--;
+			}
+		}
+	}
+
 
 	if(!clock_ticks)
 	{
+	
 		for(i=0;i<onew_dev_num;i++)
 		{
 			temp[i] = ds18b20_read_temp(i);
 			ds18b20_convert_temp(i);
 		}
 		/*
-		 * Calculating average temperatures FIXME
+		 * Calculating average temperatures - set it depending on your sensors layout
 		 */
-		temp[3]=temp[0];
-		temp[4]=temp[1];
+		temp[AC_TEMP_OUT_AVG]=temp[2];
+		temp[AC_TEMP_IN_AVG]=(((int32_t)temp[1])+(int32_t)(temp[1]))/2;
 
 		ac_control_auto();
+
 	}
 
 	clock_ticks++;
@@ -343,4 +495,34 @@ SIGNAL(SIG_INTERRUPT0)
 
 }
 
-
+// Doors open interrupt
+SIGNAL(SIG_INTERRUPT1)
+{
+	static bool all_doors_closed=true;
+	return;
+	/*
+	 * Interrupt on main board is generated through PB1
+	 */
+	if(get_doors_state())
+	{
+		if(all_doors_closed)
+		{
+			_delay_us(100);
+			if(get_doors_state())
+			{
+				all_doors_closed=false;
+				PORTB |= _BV(1);
+				_delay_us(2);
+				PORTB &= ~_BV(1);
+			}
+		}
+	}
+	else
+	{
+		_delay_us(100);
+		if(!get_doors_state())
+		{
+			all_doors_closed=true;;
+		}
+	}
+}

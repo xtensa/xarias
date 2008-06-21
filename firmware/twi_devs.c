@@ -201,7 +201,7 @@ uint8_t twi_write_byte(uint8_t data)
 	printf("D");
 #endif
 
-	if ( TW_STATUS != TW_MT_DATA_ACK) 
+	if ( TW_STATUS != TW_MT_DATA_ACK && TW_STATUS != 0xf8) 
 	{
 		twi_recover();
 		return TW_STATUS;
@@ -275,7 +275,7 @@ void twi_read_str(uint8_t dev_addr, uint8_t count, bool release_twi)
 {
 	uint8_t i, tries=0, errcode=0;
 	uint8_t prev_prog_part=prog_part;
-	prog_part = PROGPART_DS1307_READ;
+	prog_part = PROGPART_TWI_READ;
 	
 	do 
 	{
@@ -300,7 +300,7 @@ void twi_write_str(uint8_t dev_addr, uint8_t count, bool release_twi)
 {
 	uint8_t prev_prog_part=prog_part, errcode=0, tries=0, i;
 
-	prog_part = PROGPART_DS1307_WRITE;
+	prog_part = PROGPART_TWI_WRITE;
 
 	do {
 		tries++;
@@ -324,9 +324,15 @@ void twi_write_str(uint8_t dev_addr, uint8_t count, bool release_twi)
 
 void ds1307_write_ctrl()
 {
+	twi_data_buf[0]=0x00;
+	twi_read_str(TWIADDR_DS1307,1,false);
+
+	twi_data_buf[1] = twi_data_buf[0] & 0x7F;
+	twi_data_buf[0] = 0x00;
+	twi_write_str(TWIADDR_DS1307,2,false);
+
 	twi_data_buf[0]=0x07;
 	twi_data_buf[1]=_BV(4)|_BV(0)|_BV(1);
-
 	twi_write_str(TWIADDR_DS1307,2,true);
 }
 

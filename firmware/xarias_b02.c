@@ -57,6 +57,8 @@
 #define SPEED_TICKS 2548
 
 
+#define RPM_MULTIPLIER 20
+
 //#define KB_SET(i)   kb_state |=  _BV(i)
 //#define KB_UNSET(i) kb_state &= ~_BV(i)
 
@@ -88,7 +90,7 @@ uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED;
 /*
  * The following variable is used to store current working mode
  */
-uint8_t modestate;
+uint8_t modestate = MODE_SPEED;
 
 
 
@@ -283,6 +285,7 @@ uint16_t ROUND2(uint32_t val, uint8_t mult, uint8_t prec)
 
 
 
+#define IS_MODE_MAIN(mode) (mode==MODE_SPEED || mode==MODE_TRIP || mode==MODE_FUEL || mode==MODE_RPM)
 
 
 
@@ -295,10 +298,14 @@ void set_mode(uint8_t mode)
 	mode_changed=true;
 	lcd_update=true;
 	gLCD_cls();
-	if(mode==MODE_SPEED || mode==MODE_TRIP || mode==MODE_FUEL || mode==MODE_RPM)
+	if(IS_MODE_MAIN(mode))
 	{
 		MODE_MAIN=mode;
 		draw_frame01();
+
+		twi_data_buf[0] = 0x14;
+		twi_data_buf[1] = mode;
+		twi_write_str(TWIADDR_DS1307,2,true);
 	}
 	if(mode==MODE_MENU)
 	{
@@ -384,13 +391,87 @@ int32_t ac_get_temp(uint8_t sensor_no)
 	_delay_us(10);
 	
 	return 
-		(((int32_t)twi_data_buf[0])    ) |
-		(((int32_t)twi_data_buf[1])<<8 ) |
-		(((int32_t)twi_data_buf[2])<<16) |
-		(((int32_t)twi_data_buf[3])<<24) 
+		(((int32_t)twi_data_buf[0])      ) |
+		(((int32_t)twi_data_buf[1]) << 8 ) |
+		(((int32_t)twi_data_buf[2]) << 16) |
+		(((int32_t)twi_data_buf[3]) << 24) 
 		;
 }
 
+void save_passed_data()
+{
+	twi_data_buf[0] = 0x15;
+
+	/*
+	 * Saving passed_inj_ticks
+	 */
+	twi_data_buf[1] = (uint8_t)(passed_inj_ticks);
+	twi_data_buf[2] = (uint8_t)(passed_inj_ticks >> 8);
+	twi_data_buf[3] = (uint8_t)(passed_inj_ticks >> 16);
+	twi_data_buf[4] = (uint8_t)(passed_inj_ticks >> 24);
+
+	/*
+	 * Saving passed_inj_ticks_overruns
+	 */
+	twi_data_buf[5] = (uint8_t)(passed_inj_ticks_overruns);
+	twi_data_buf[6] = (uint8_t)(passed_inj_ticks_overruns >> 8);
+	twi_data_buf[7] = (uint8_t)(passed_inj_ticks_overruns >> 16);
+	twi_data_buf[8] = (uint8_t)(passed_inj_ticks_overruns >> 24);
+
+	/*
+	 * Saving passed_speed_ticks
+	 */
+	twi_data_buf[9]  = (uint8_t)(passed_speed_ticks);
+	twi_data_buf[10] = (uint8_t)(passed_speed_ticks >> 8);
+	twi_data_buf[11] = (uint8_t)(passed_speed_ticks >> 16);
+	twi_data_buf[12] = (uint8_t)(passed_speed_ticks >> 24);
+
+	/*
+	 * Saving passed_seconds
+	 */
+	twi_data_buf[13] = (uint8_t)(passed_seconds);
+	twi_data_buf[14] = (uint8_t)(passed_seconds >> 8);
+	twi_data_buf[15] = (uint8_t)(passed_seconds >> 16);
+	twi_data_buf[16] = (uint8_t)(passed_seconds >> 24);
+
+	twi_write_str(TWIADDR_DS1307,17,true);
+}
+
+void restore_passed_data()
+{
+	twi_data_buf[0] = 0x15;
+	twi_write_str(TWIADDR_DS1307,1,false); // sending start address to read from
+	twi_read_str(TWIADDR_DS1307,16,true);
+
+	passed_inj_ticks =		
+		(((int32_t)twi_data_buf[0])      ) |
+		(((int32_t)twi_data_buf[1]) << 8 ) |
+		(((int32_t)twi_data_buf[2]) << 16) |
+		(((int32_t)twi_data_buf[3]) << 24) 
+		;
+ 
+	passed_inj_ticks_overruns =		
+		(((int32_t)twi_data_buf[4])      ) |
+		(((int32_t)twi_data_buf[5]) << 8 ) |
+		(((int32_t)twi_data_buf[6]) << 16) |
+		(((int32_t)twi_data_buf[7]) << 24) 
+		;
+ 
+	passed_speed_ticks =		
+		(((int32_t)twi_data_buf[8])      ) |
+		(((int32_t)twi_data_buf[9]) << 8 ) |
+		(((int32_t)twi_data_buf[10]) << 16) |
+		(((int32_t)twi_data_buf[11]) << 24) 
+		;
+ 
+	passed_seconds =		
+		(((int32_t)twi_data_buf[12])      ) |
+		(((int32_t)twi_data_buf[13]) << 8 ) |
+		(((int32_t)twi_data_buf[14]) << 16) |
+		(((int32_t)twi_data_buf[15]) << 24) 
+		;
+ 
+}
 
 /*
  * Do all the startup-time peripheral initializations.
@@ -410,9 +491,10 @@ static void xarias_init(void)
 	ds1803_write(0,contrast);
 	ds1803_write(1,brightness);
 
+	ds1307_write_ctrl();
 
 	/*
-	 * First we should check if there was lack of power and ds1307 memory was erased.
+	 * Checking if there was lack of power and ds1307 memory was erased.
 	 * Writing start address 08h - the beginning of data memory.
 	 * The check is simple: sum of two first bytes should give us third byte
 	 */
@@ -428,9 +510,16 @@ static void xarias_init(void)
 	 *	0x0E-0x10 : currency
 	 *	0x11-0x12 : fuel cost
 	 *	0x13      : desired A/C temperature
+	 *	0x14      : last mode
+	 *	0x15-0x18 : passed_inj_ticks
+	 *	0x19-0x1C : passed_inj_ticks_overruns
+	 *	0x1D-0x20 : passed_speed_ticks
+	 *	0x21-0x24 : passed_seconds
 	 */
 	if((uint8_t)(twi_data_buf[0]+twi_data_buf[1])!=twi_data_buf[2] || (!twi_data_buf[0] && !twi_data_buf[1]) )
 	{
+		_delay_us(5); // wait a little bit before next TWI operation
+		
 		/*
 		 * First turn on LCD
 		 */
@@ -461,6 +550,7 @@ static void xarias_init(void)
 		twi_data_buf[2]=twi_data_buf[1];
 		twi_data_buf[1]=twi_data_buf[0];
 		twi_data_buf[0]=0x08;
+		
 		/*
 		 * Writing all the variables that should be saved
 		 */
@@ -473,8 +563,9 @@ static void xarias_init(void)
 		twi_data_buf[10]  = ((uint8_t)(fuel_cost>>8));
 		twi_data_buf[11] = ((uint8_t)(fuel_cost));
 		twi_data_buf[12] = (temp_ac);
+		twi_data_buf[13] = (modestate);
 
-		twi_write_str(TWIADDR_DS1307,13,true);
+		twi_write_str(TWIADDR_DS1307,14,true);
 
 	}	
 	else 
@@ -482,19 +573,21 @@ static void xarias_init(void)
 		/*
 		 * Reading existing data and restore settings
 		 */
-
-
-		twi_read_str(TWIADDR_DS1307,9,true);
+		twi_read_str(TWIADDR_DS1307,10,false);
 
 		contrast    	= twi_data_buf[0];
 		brightness  	= twi_data_buf[1];
-		aflags		= twi_data_buf[2];
+		aflags		= twi_data_buf[2] & ~FLAG_AC_ONOFF;
 		currency[0] 	= (char)twi_data_buf[3];
 		currency[1] 	= (char)twi_data_buf[4];
 		currency[2] 	= twi_data_buf[5];
 		fuel_cost 	= (uint16_t) (twi_data_buf[6]) << 8;
 		fuel_cost      += twi_data_buf[7];
 		temp_ac 	= twi_data_buf[8];
+		modestate	= twi_data_buf[9];
+
+		restore_passed_data();
+		_delay_us(5); // wait a little bit before next TWI operation
 
 /*		twi_start();
 		twi_read_addr(TWIADDR_DS1307);
@@ -562,11 +655,15 @@ static void xarias_init(void)
 	 *
 	 * Enable external interrupt 0
 	 */
-	GICR = _BV(INT0);
+	GICR = _BV(INT0) | _BV(INT2) ;
 	/*
 	 * Falling edge will generate interrupt 0
 	 */
 	MCUCR |= _BV(1);
+	/*
+	 * Falling edge will generate interrupt 2
+	 */
+	MCUCSR &= ~_BV(6);
 	/*
 	 * enable pull-up resistors for ports D2 and D3
 	 */
@@ -592,7 +689,7 @@ static void xarias_init(void)
 	 */
 	sei();
 
-	set_mode(MODE_MAIN);
+	set_mode(modestate);
 }
 
 
@@ -732,14 +829,6 @@ void if_draw_progressbar(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t
 	gLCD_fill_rect(xx+1,y1+1,x2-1,y2-1,0x00);
 }
 
-void kb_set(uint8_t i, uint8_t j, uint8_t is_on)
-{
-	gLCD_locate(i*29,j*10);
-	if(is_on)
-		printf_P(PSTR("%u/%u"),i,j);
-	else
-		printf_P(PSTR("%u-%u"),i,j);
-}
 
 uint8_t inline kb_column_getstate(uint8_t col)
 {
@@ -777,6 +866,8 @@ void draw_frame01()
 void draw_acinfo()
 {
 	char str_temp='F';
+	
+	if(!IS_MODE_MAIN(modestate)) return;
 
 	if(AFLAGS_ISSET(FLAG_IS_CELSIUS)) str_temp='C';
 	
@@ -825,7 +916,7 @@ void draw_clock()
 {
 	ds1307_read_time(&seconds, &minutes, &is12h, pmstr, &hours, &day, &date, &month, &year);
 	gLCD_locate(46,47);
-	printf_P(PSTR("%s%2u:%02u"),pmstr,hours,minutes);
+	printf_P(PSTR("%s%2u%c%02u"),pmstr,hours,(seconds%2?' ':':'),minutes);
 	gLCD_locate(58,55);
 	printf_P(PSTR("%02u/%02u"),date,month);
 }
@@ -854,7 +945,10 @@ int main()
 	/*
 	 * Wait for power to stabilize
 	 */
-	_delay_ms(20);
+	for(i=0;i<50;i++)
+	{
+		_delay_ms(10);
+	}
 
 	xarias_init();
 
@@ -884,6 +978,16 @@ while(f==g)
 	printf("%lu",passed_distance);
 	return 0;
 */
+/*
+	twi_data_buf[0]=0x99;
+	twi_data_buf[1]=4;
+	twi_data_buf[2]=1;
+	twi_data_buf[3]=40;
+	twi_data_buf[4]=40;
+	twi_write_str(TWIADDR_DS1307, 5, true);
+	twi_data_buf[0]=AC_CMD_MAKE_BEEPS;
+	twi_write_str(TWIADDR_DS1307, 1, true);
+*/
 	while(1)
 	{
 		char str_temp;
@@ -907,6 +1011,16 @@ while(f==g)
 					if(!(pin=kb_column_getstate(i)))
 					{
 						kb_state[i+j*4]++;
+				/*		if(kb_state[i+j*4]==1)
+						{
+							twi_data_buf[0]=AC_CMD_MAKE_BEEPS;
+							twi_data_buf[1]=1;
+							twi_data_buf[1]=1;
+							twi_data_buf[2]=40;
+							twi_data_buf[3]=40;
+							twi_write_str(TWIADDR_DS1307, 5, true);
+						}
+				*/
 						kb_sth_pressed=1;
 						if(kb_state[i+j*4]==REPEAT_STROKES+1) kb_state[i+j*4]=REPEAT_STROKES - kb_repeat_speed;
 					}
@@ -957,19 +1071,30 @@ while(f==g)
 				}
 				if(KB_FUNC5==1) 
 				{
-					//gLCD_switchon();
-					//gLCD_switchoff();
-					//set_mode(MODE_MAIN);
+					static uint8_t i=1;
+					if(i)
+					{
+						gLCD_switchoff();
+						i=0;
+					}
+					else
+					{
+						gLCD_switchon();
+						i=1;
+					}
+					set_mode(MODE_MAIN);
 				}
 				
 				if(KB_FUNC6==1) ac_pressed=1;
 				
 				if(!KB_FUNC6 && ac_pressed && ac_pressed<REPEAT_STROKES) // switching A/C ON or OFF
 				{
-					aflags ^= FLAG_AC_ONOFF;
-					save_aflags(1);
-					
-					draw_acinfo();
+					if(rpm_ticks > 600/RPM_MULTIPLIER)
+					{
+						aflags ^= FLAG_AC_ONOFF;
+						save_aflags(1);
+						draw_acinfo();
+					}
 					ac_pressed=0;
 				}
 				if(KB_FUNC6==REPEAT_STROKES && ac_pressed) ac_pressed++;
@@ -1242,6 +1367,7 @@ while(f==g)
 							passed_speed_ticks 		= 0;
 
 							ds1307_write_ctrl();
+							save_passed_data();
 
 							error(ERROR_OK);
 						} break;
@@ -1467,6 +1593,7 @@ while(f==g)
 		{
 			char str_dist[3]="km", str_mdist[2]="m", str_vol='l';
 			lcd_update=false;
+			prog_part=PROGPART_LCD_UPDATE;
 
 			if(modestate==MODE_MAIN)
 			{
@@ -1582,9 +1709,9 @@ while(f==g)
 					 * MAIN for this mode - current RPM
 					 */
 					gLCD_locate(15,11);
-					fprintf(&gLCD_str16x24,"%3u",rpm_ticks/1000); // FIXME
-					gLCD_locate(65,28);
-					printf_P(PSTR("rpm"));
+					fprintf(&gLCD_str16x24,"%4u",rpm_ticks * RPM_MULTIPLIER); // FIXME
+					//gLCD_locate(65,28);
+					//printf_P(PSTR("rpm"));
 
 					/*
 					 * Speed in m/s
@@ -1936,7 +2063,7 @@ while(f==g)
 					gLCD_locate(2,34);
 					printf_P(PSTR("Inject  Speed   RPM"));
 					gLCD_locate(2,42);
-					printf_P(PSTR("%5u  %5u  %5u"),last_inj_ticks,speed_ticks,rpm_ticks*20);
+					printf_P(PSTR("%5u  %5u  %5u"),last_inj_ticks,speed_ticks,rpm_ticks);
 
 			
 					// printing time
@@ -1965,6 +2092,7 @@ SIGNAL(SIG_INTERRUPT0)
 {
 	uint8_t pin_inj_state=PIN_INJ, tcnt0;
 	static uint16_t inj_ticks;
+	static bool is_engine_running=0;
 	
 	if(!pin_inj_state) inj_ticks++;
 
@@ -2023,11 +2151,54 @@ SIGNAL(SIG_INTERRUPT0)
 		}
 	}
 
+	/*
+	 * The following check occure 3 times per second
+	 */
+	if(!clock_ticks%10000) 
+	{
+		save_passed_data();
+
+		if(rpm_ticks < 600 / RPM_MULTIPLIER)
+		{
+			if(aflags | FLAG_AC_ONOFF && is_engine_running)
+			{
+				aflags &= ~FLAG_AC_ONOFF;
+				save_aflags(1);
+				draw_acinfo();
+			}
+			is_engine_running = false;
+		}
+		else
+		{
+			is_engine_running = true;
+		}
+	}
+
 	clock_ticks++;
-	if(clock_ticks==32768)
+	if(clock_ticks == 32768)
 	{
 		clock_ticks=0;
 	}
+}
+
+SIGNAL(SIG_INTERRUPT2)
+{
+	uint8_t old_progpart=prog_part;
+	// TODO door status will be developed later
+	return;
+	
+
+	prog_part=0x99;
+
+	twi_data_buf[0]=AC_CMD_GET_DOORS;
+	twi_write_str(TWIADDR_AC,1,false);
+	twi_read_str(TWIADDR_AC,1,true);
+	if(twi_data_buf[0]) 
+	{
+		error(twi_data_buf[0]);
+	}
+
+	prog_part=old_progpart;
 }
 
 

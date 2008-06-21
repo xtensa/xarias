@@ -36,7 +36,7 @@ CFLAGS        += $(if $(findstring _b01,$@),-mmcu=${MAIN_MCU_TARGET} -D F_CPU=${
 CFLAGS        += $(if $(findstring _b02,$@),-mmcu=${MAIN_MCU_TARGET} -D F_CPU=${MAIN_F_CPU},)
 CFLAGS        += $(if $(findstring _ac,$@),-mmcu=${AC_MCU_TARGET} -D F_CPU=${AC_F_CPU},)
 
-LFUSE          = $(if $(findstring _ac,$@),A4,FF)
+LFUSE          = $(if $(findstring _ac,$@),FF,FF)
 HFUSE          = $(if $(findstring _ac,$@),D9,CF)
 AVRTARGET      = $(if $(findstring _ac,$@),m8,m32)
 
