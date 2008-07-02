@@ -2,18 +2,31 @@
 
 = Introduction =
 
-XARIAS is embeded system that runs under Atmel's ATmega control. It is designed to gain different information from your car and display it in human-readable form. In the feature it will also be capable of controlling different car subsystems (like aircon or power window). At the moment XARIAS v0.1 is capable of doing the following:
+XARIAS is embeded system that runs under Atmel's ATmega control. It is designed to gain different information from your car and display it in human-readable form. In the feature it will also be capable of controlling different car subsystems (like power window). At the moment XARIAS v02 is capable of doing the following:
  * calculate momentary and avarage speed
  * calculate momentary and avarage fuel consumption
+ * calculate engine RPM 
  * calculate journey time and distance
-It's not much but it's just a begining. What is planned to implement:
+ * calculate total fuel consumed and it's cost
  * temeprature sensors (inside/outside)
- * aircon control and programming
- * automatic window closing
+ * air conditioner automatic control and programming
 
 
 = Hardware =
 
-The heart of the system is ATMega MCU. It is also used DS1307 RTC from Dallas Semiconductor. DS1307 is the best choice here, because it has programmable squarewave output signal, 56 bytes of nonvolatile memory and automatic powerfail detect and switch circuity. Output signal is used to trigger measurement routines and nonvolatile memory will be used to store preferances and statistics.
+== XARIAS board b02 ==
 
-Currently only Hitachi HD44780-compatible displays are supported. 
+=== MCU ===
+The heart of the system is ATMega MCU. 
+
+=== LCD ===
+Currently Hitachi HD44780 and Samsung KS0108 compatible displays are supported. 
+
+=== DS1307 RTC ===
+DS1307 RTC from Dallas Semiconductor. DS1307 is the best choice here, because it has programmable squarewave output signal, 56 bytes of nonvolatile memory and automatic powerfail detect and switch circuity. Output signal is used to trigger measurement routines and nonvolatile memory is used to store preferences and statistics.
+
+=== CD74HC14E ===
+High Speed CMOS Logic Hex Schmitt-Triggered Inverters are used to achieve correct square wave signal and get rid of most distortions.
+
+=== DS1804 ===
+Double digital potentiometer is used to control brightnes and contrast of the LCD display. DS1804 is controlled through I2C bus as well as DS1307 clock.
