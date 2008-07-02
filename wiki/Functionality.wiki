@@ -1,4 +1,12 @@
 #summary Functionality description of XARIAS embeded computer.
+
+|| *Other pages* ||
+|| [AboutXARIAS] ||
+|| [Functionality] ||
+|| [Hardware] ||
+|| [Firmware] ||
+|| [Author] ||
+
 = XARIAS functionality =
 
 XARIAS has wide range of functional capabilities.
