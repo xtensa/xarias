@@ -9,10 +9,10 @@ XARIAS is embeded system that runs under Atmel's ATmega32 MCU control. It is des
 In the feature it will also be capable of controlling different car subsystems (like power window). At the moment XARIAS v02 is capable of doing the following:
  * calculate momentary and avarage speed
  * calculate momentary and avarage fuel consumption
- * calculate engine RPM 
+ * show engine RPM 
  * calculate journey time and distance
  * calculate total fuel consumed and it's cost
- * temeprature sensors (inside/outside)
+ * show temepratures (inside/outside)
  * air conditioner automatic control and programming
 
 For more information about hardware visit [Hardware] page.
