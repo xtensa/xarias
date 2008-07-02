@@ -59,7 +59,7 @@ On all images above you can see that right side of the display is reserved for A
 || Trip settings || You can adjust all units here and reset trip data ||
 || Date/Time settings || Set date and time here ||
 || Screen adjustment || Adjust display parameters here ||
-|| !AirCon settings || Change temperature scale here and view sensor information here ||
+|| !AirCon settings || Change temperature scale and view sensor information here ||
 || Service mode || Useful for developers only. Probably will be removed in final version ||
 
 == Trip settings ==
