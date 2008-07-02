@@ -1,5 +1,7 @@
 #summary General description of the XARIAS project
 
+*Other pages:* [AboutXARIAS], [Functionality], [Hardware], [SourceCode], [Author]
+
 = Introduction =
 
 XARIAS is embeded system that runs under Atmel's ATmega32 MCU control. It is designed to gain different information from your car and display it in human-readable form.
