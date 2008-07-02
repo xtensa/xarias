@@ -1,0 +1,8 @@
+#summary Source code description and facts
+
+= Firmware =
+XARIAS is an Open Source project. The source code of the firmware is written in C language and is available on GPLv3 license. Currently you can download verion v02 only from SVN. To compile the source code you will need avr-gcc and avr-libc [http://www.nongnu.org/avr-libc/].
+
+= Schematics and PCB =
+All schematics are designed usin gEDA Open Source tool ([http://www.geda.seul.org/]) and PCB is designed using Open Source PCB tool ([http://pcb.sourceforge.net/]).
+
