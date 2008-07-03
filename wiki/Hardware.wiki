@@ -38,3 +38,11 @@ ICL7667 mosfet driver is used to convert CMOS signal to 12V signal. You can also
 
 === IRFZ48N ===
 Good MOSFET is very important if you want it to drive 4 to 9 amper motor as blower motor is. IRFZ48N is very good choice as it has ultra low on-resitance (RDS=0.014 Ohm).
+
+== Keyboard ==
+
+XARIAS uses simple 4x3 serial keyboard with small improvement to make it possible to press several buttons at the time. Here is keyboard map:
+|| || *COL1* || *COL2* || *COL3* || *COL4* ||
+|| *ROW1* || OK || UP || RIGHT || LEFT ||
+|| *ROW2* || ESC || DOWN || AC || FN ||
+|| *ROW3* || FL || SPD || TRP || RPM ||
