@@ -97,6 +97,12 @@ Smoothly adjust screen settings here.
 
 Choose between Celsius and Fahrenheit scale here. You can also see current temperature on each sensor here.
 
+== Openned dorrs mode ==
+
+[http://lh6.ggpht.com/xtensa/SHE8oHQcawI/AAAAAAAABsM/Jz4lC2YZ0Qg/p1160495.jpg?imgmax=400]
+
+If the system is in one of the main modes and th door is openned, xarias will automatically display which one is openned. You can exit this mode by closing all doors or manually by pressing OK or ESC button. To eneter this mode manuall just press FN button (maybe changed in the feature).
+
 == Service mode ==
 
 Service mode is useful for developers only. In final version it will be probably removed from the main menu. 
