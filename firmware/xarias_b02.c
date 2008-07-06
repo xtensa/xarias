@@ -49,7 +49,7 @@
  * For Toyota Corolla 1,3 4EFE it's 136 - 176
  * For Toyota Corolla 1,6 4AFE it's 160 - 200
  */
-#define INJ_FLOW 146
+#define INJ_FLOW 136
 
 /*
  * Number of ticks per one kilometer
@@ -83,9 +83,10 @@ char mainmenu_strings[6][19]={	"Trip settings",
 #define MODE_FUEL		0x07
 #define MODE_SPEED		0x08
 #define MODE_RPM		0x09
+#define MODE_DOORS_STATE	0x0A
 
 #define MODE_SENSORS_INFO	0xF0
-uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED;
+uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED, doors_state=0;
 
 /*
  * The following variable is used to store current working mode
@@ -101,7 +102,7 @@ uint8_t modestate = MODE_SPEED;
  */
 uint8_t kb_repeat_speed=0;
 //#define REPEAT_STROKES 250
-uint8_t REPEAT_STROKES=250;
+uint8_t REPEAT_STROKES=25;
 
 
 /*
@@ -296,7 +297,6 @@ void set_mode(uint8_t mode)
 {
 	modestate=mode;
 	mode_changed=true;
-	lcd_update=true;
 	gLCD_cls();
 	if(IS_MODE_MAIN(mode))
 	{
@@ -314,6 +314,7 @@ void set_mode(uint8_t mode)
 	}
 	kb_repeat_speed=0;
 	REPEAT_STROKES=250;
+	lcd_update=true;
 }
 
 
@@ -379,6 +380,16 @@ void save_aflags(uint8_t send_to_ac)
 
 	if(send_to_ac) ac_send_cmd(AC_CMD_SET_MODE);
 }
+
+
+void ac_get_doors_state()
+{
+	twi_data_buf[0]=AC_CMD_GET_DOORS;
+	twi_write_str(TWIADDR_AC,1,false);
+	twi_read_str(TWIADDR_AC,1,true);
+	doors_state=twi_data_buf[0];
+}
+
 
 int32_t ac_get_temp(uint8_t sensor_no)
 {
@@ -1071,7 +1082,7 @@ while(f==g)
 				}
 				if(KB_FUNC5==1) 
 				{
-					static uint8_t i=1;
+				/*	static uint8_t i=1;
 					if(i)
 					{
 						gLCD_switchoff();
@@ -1082,7 +1093,9 @@ while(f==g)
 						gLCD_switchon();
 						i=1;
 					}
-					set_mode(MODE_MAIN);
+				*/
+					ac_get_doors_state();
+					set_mode(MODE_DOORS_STATE);
 				}
 				
 				if(KB_FUNC6==1) ac_pressed=1;
@@ -1581,6 +1594,14 @@ while(f==g)
 				}
 			} break;
 
+			case MODE_DOORS_STATE:
+			{
+				if(KB_ESC || KB_OK)
+				{
+					set_mode(MODE_MAIN);
+				}
+			} break;
+
 			default: error(ERROR_UNKNOWN_MODE);
 		}
 		/*
@@ -1592,7 +1613,6 @@ while(f==g)
 		if(lcd_update)
 		{
 			char str_dist[3]="km", str_mdist[2]="m", str_vol='l';
-			lcd_update=false;
 			prog_part=PROGPART_LCD_UPDATE;
 
 			if(modestate==MODE_MAIN)
@@ -2077,11 +2097,158 @@ while(f==g)
 
 				} break;
 
-			} // switch
+				case MODE_DOORS_STATE:
+				{
+					int8_t side;
+					#define XOFFSET 		100
+					#define DOOR_FRONT_LEFT 	0x20
+					#define DOOR_FRONT_RIGHT 	0x10
+					#define DOOR_REER_LEFT	 	0x08
+					#define DOOR_REER_RIGHT	 	0x04
+					#define DOOR_BOOT		0x02
+					#define DOOR_BONNET		0x01
+
+					gLCD_frame(0,0,127,63,1,true);
+					gLCD_locate(2,2);
+					printf_P(doors_state?PSTR("DOORS OPENED"):PSTR("DOORS CLOSED"));
+
+					for(side=-1; side<2; side+=2)
+					{
+						gLCD_line(XOFFSET+0*side,3,XOFFSET+6*side,3,true);
+						gLCD_line(XOFFSET+6*side,4,XOFFSET+8*side,4,true);
+						gLCD_line(XOFFSET+7*side,5,XOFFSET+9*side,5,true);
+						gLCD_line(XOFFSET+9*side,5,XOFFSET+9*side,11,true);
+						gLCD_line(XOFFSET+10*side,12,XOFFSET+10*side,21,true);
+						gLCD_line(XOFFSET+6*side,20,XOFFSET+9*side,20,true);
+						gLCD_line(XOFFSET+0*side,19,XOFFSET+5*side,19,true);
+						gLCD_line(XOFFSET+10*side,21,XOFFSET+8*side,26,true);
+						gLCD_line(XOFFSET+0*side,27,XOFFSET+7*side,27,true);
+						gLCD_line(XOFFSET+8*side,27,XOFFSET+8*side,44,true);
+						gLCD_line(XOFFSET+7*side,44,XOFFSET+0*side,44,true);
+						gLCD_line(XOFFSET+8*side,45,XOFFSET+10*side,50,true);
+						gLCD_line(XOFFSET+0*side,51,XOFFSET+10*side,51,true);
+						gLCD_line(XOFFSET+9*side,45,XOFFSET+10*side,45,true);
+						gLCD_line(XOFFSET+10*side,46,XOFFSET+10*side,56,true);
+						gLCD_line(XOFFSET+9*side,56,XOFFSET+9*side,58,true);
+						gLCD_line(XOFFSET+0*side,59,XOFFSET+8*side,59,true);
+						gLCD_line(XOFFSET+9*side,38,XOFFSET+10*side,37,true);
+						gLCD_line(XOFFSET+6*side,58,XOFFSET+7*side,58,true);
+
+						if(side == -1) // left side of the car
+						{
+							if(doors_state & DOOR_FRONT_LEFT)
+							{ 	// door opened
+								gLCD_line(XOFFSET+11*side,22,XOFFSET+20*side,31,true);
+								gLCD_line(XOFFSET+10*side,23,XOFFSET+19*side,32,true);
+							}
+							else
+							{	// door closed
+								gLCD_line(XOFFSET+10*side,22,XOFFSET+10*side,36,true);
+							}
+							if(doors_state & DOOR_REER_LEFT)
+							{ 	// door opened
+								gLCD_line(XOFFSET+11*side,36,XOFFSET+18*side,43,true);
+								gLCD_line(XOFFSET+10*side,37,XOFFSET+17*side,44,true);
+							}
+							else
+							{	// door closed
+								gLCD_line(XOFFSET+10*side,36,XOFFSET+10*side,46,true);
+							}						
+						}
+						if(side == 1) // right side of the car
+						{
+							if(doors_state & DOOR_FRONT_RIGHT)
+							{ 	// door opened
+								gLCD_line(XOFFSET+11*side,22,XOFFSET+20*side,31,true);
+								gLCD_line(XOFFSET+10*side,23,XOFFSET+19*side,32,true);
+							}
+							else
+							{	// door closed
+								gLCD_line(XOFFSET+10*side,22,XOFFSET+10*side,36,true);
+							}
+							if(doors_state & DOOR_REER_RIGHT)
+							{ 	// door opened
+								gLCD_line(XOFFSET+11*side,36,XOFFSET+18*side,43,true);
+								gLCD_line(XOFFSET+10*side,37,XOFFSET+17*side,44,true);
+							}
+							else
+							{	// door closed
+								gLCD_line(XOFFSET+10*side,36,XOFFSET+10*side,46,true);
+							}
+						}
+					}
+
+					// Drawing side view
+					#define XSHIFT	5
+					#define YSHIFT	35
+					gLCD_line(XSHIFT+5,YSHIFT+17,XSHIFT+1,YSHIFT+17,true);
+					gLCD_line(XSHIFT+1,YSHIFT+16,XSHIFT+1,YSHIFT+13,true);
+					gLCD_line(XSHIFT+1,YSHIFT+13,XSHIFT+3,YSHIFT+13,true);
+					gLCD_line(XSHIFT+2,YSHIFT+12,XSHIFT+4,YSHIFT+10,true);
+					gLCD_line(XSHIFT+5,YSHIFT+10,XSHIFT+18,YSHIFT+8,true);
+					gLCD_line(XSHIFT+19,YSHIFT+7,XSHIFT+32,YSHIFT+1,true);
+					gLCD_line(XSHIFT+32,YSHIFT+1,XSHIFT+47,YSHIFT+1,true);
+					gLCD_line(XSHIFT+47,YSHIFT+1,XSHIFT+60,YSHIFT+7,true);
+					gLCD_line(XSHIFT+60,YSHIFT+7,XSHIFT+64,YSHIFT+7,true);
+					gLCD_line(XSHIFT+65,YSHIFT+8,XSHIFT+65,YSHIFT+11,true);
+					gLCD_line(XSHIFT+64,YSHIFT+9,XSHIFT+64,YSHIFT+10,true);
+					gLCD_line(XSHIFT+64,YSHIFT+12,XSHIFT+66,YSHIFT+12,true);
+					gLCD_line(XSHIFT+66,YSHIFT+12,XSHIFT+66,YSHIFT+16,true);
+					gLCD_line(XSHIFT+65,YSHIFT+17,XSHIFT+62,YSHIFT+17,true);
+
+					gLCD_line(XSHIFT+51,YSHIFT+17,XSHIFT+16,YSHIFT+17,true);
+					gLCD_line(XSHIFT+58,YSHIFT+8,XSHIFT+19,YSHIFT+8,true);
+					gLCD_line(XSHIFT+19,YSHIFT+9,XSHIFT+18,YSHIFT+16,true);
+					gLCD_line(XSHIFT+36,YSHIFT+16,XSHIFT+37,YSHIFT+2,true);
+					gLCD_line(XSHIFT+32,YSHIFT+10,XSHIFT+33,YSHIFT+10,true);
+					gLCD_line(XSHIFT+48,YSHIFT+10,XSHIFT+49,YSHIFT+10,true);
+
+					for(side=0;side<50;side+=46)
+					{
+						gLCD_line(XSHIFT+side+6,YSHIFT+16,XSHIFT+side+6,YSHIFT+14,true);
+						gLCD_line(XSHIFT+side+6,YSHIFT+14,XSHIFT+side+9,YSHIFT+11,true);
+						gLCD_line(XSHIFT+side+9,YSHIFT+11,XSHIFT+side+12,YSHIFT+11,true);
+						gLCD_line(XSHIFT+side+12,YSHIFT+11,XSHIFT+side+15,YSHIFT+14,true);
+						gLCD_line(XSHIFT+side+15,YSHIFT+14,XSHIFT+side+15,YSHIFT+16,true);
+
+						gLCD_line(XSHIFT+side+9,YSHIFT+19,XSHIFT+side+7,YSHIFT+17,true);
+						gLCD_line(XSHIFT+side+7,YSHIFT+17,XSHIFT+side+7,YSHIFT+15,true);
+						gLCD_line(XSHIFT+side+7,YSHIFT+15,XSHIFT+side+9,YSHIFT+13,true);
+						gLCD_line(XSHIFT+side+9,YSHIFT+13,XSHIFT+side+12,YSHIFT+13,true);
+						gLCD_line(XSHIFT+side+12,YSHIFT+13,XSHIFT+side+14,YSHIFT+15,true);
+						gLCD_line(XSHIFT+side+14,YSHIFT+15,XSHIFT+side+14,YSHIFT+17,true);
+						gLCD_line(XSHIFT+side+14,YSHIFT+17,XSHIFT+side+12,YSHIFT+19,true);
+						gLCD_line(XSHIFT+side+12,YSHIFT+19,XSHIFT+side+9,YSHIFT+19,true);
+
+						gLCD_line(XSHIFT+side+8,YSHIFT+17,XSHIFT+side+8,YSHIFT+15,true);
+						gLCD_line(XSHIFT+side+9,YSHIFT+14,XSHIFT+side+12,YSHIFT+14,true);
+						gLCD_line(XSHIFT+side+13,YSHIFT+15,XSHIFT+side+13,YSHIFT+17,true);
+						gLCD_line(XSHIFT+side+12,YSHIFT+18,XSHIFT+side+9,YSHIFT+18,true);
+
+						gLCD_pixel(XSHIFT+9,YSHIFT+17,true);
+						gLCD_pixel(XSHIFT+9,YSHIFT+15,true);
+						gLCD_pixel(XSHIFT+12,YSHIFT+15,true);
+						gLCD_pixel(XSHIFT+12,YSHIFT+17,true);
+					}
+
+					if(doors_state & DOOR_BONNET)
+					{
+						gLCD_line(XSHIFT+5,YSHIFT+0,XSHIFT+22,YSHIFT+8,true);
+						gLCD_pixel(XSHIFT+4,YSHIFT+0,true);
+					}
+					if(doors_state & DOOR_BOOT)
+					{
+						gLCD_line(XSHIFT+59,YSHIFT+6,XSHIFT+60,YSHIFT+1,true);
+						gLCD_line(XSHIFT+61,YSHIFT+0,XSHIFT+64,YSHIFT+1,true);
+					}
+				} break;
+
+			} // switch(modestate)
+			lcd_update=false;
 		} // if(lcd_update)
 		else
 		{
-			if(!mode_changed) _delay_ms(1);
+			if(!mode_changed) _delay_ms(2);
 		}
 	}
 	return 0;
@@ -2144,7 +2311,7 @@ SIGNAL(SIG_INTERRUPT0)
 		   modestate==MODE_DATETIME_SETTINGS || 
 		   modestate==MODE_SERVICE || 
 		   modestate==MODE_SENSORS_INFO
-		//   || modestate==MODE_AIRCON_SETTINGS
+		   || modestate==MODE_AIRCON_SETTINGS
 		)
 		{
 			lcd_update=true;
@@ -2154,7 +2321,7 @@ SIGNAL(SIG_INTERRUPT0)
 	/*
 	 * The following check occure 3 times per second
 	 */
-	if(!clock_ticks%10000) 
+	if(clock_ticks==10000 || clock_ticks==20000 || clock_ticks==30000)
 	{
 		save_passed_data();
 
@@ -2165,6 +2332,7 @@ SIGNAL(SIG_INTERRUPT0)
 				aflags &= ~FLAG_AC_ONOFF;
 				save_aflags(1);
 				draw_acinfo();
+				//lcd_update=true;
 			}
 			is_engine_running = false;
 		}
@@ -2184,18 +2352,20 @@ SIGNAL(SIG_INTERRUPT0)
 SIGNAL(SIG_INTERRUPT2)
 {
 	uint8_t old_progpart=prog_part;
-	// TODO door status will be developed later
-	return;
-	
 
-	prog_part=0x99;
+	prog_part=PROGPART_DOORS_STATE;
+	ac_get_doors_state();
 
-	twi_data_buf[0]=AC_CMD_GET_DOORS;
-	twi_write_str(TWIADDR_AC,1,false);
-	twi_read_str(TWIADDR_AC,1,true);
-	if(twi_data_buf[0]) 
+	if(IS_MODE_MAIN(modestate) || modestate==MODE_DOORS_STATE)
 	{
-		error(twi_data_buf[0]);
+		if(doors_state)
+		{
+			set_mode(MODE_DOORS_STATE);
+		}
+		else
+		{	
+			set_mode(MODE_MAIN);
+		}
 	}
 
 	prog_part=old_progpart;
