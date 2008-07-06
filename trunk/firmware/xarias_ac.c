@@ -56,22 +56,7 @@ void xarias_ac_init()
 {
 	bool crc_ok;
 
-        /*
-	 * Enable external interrupt 0 and 1
-	 */
-	GICR = _BV(INT0) | _BV(INT1);
-	/*
-	 * Falling edge will generate interrupt 0 and 
-	 * any logical change will generate interrupt 1
-	 */
-	MCUCR |= _BV(ISC01) | _BV(ISC10);
-	DDRD  &= ~(_BV(PORT2)|_BV(PORT3)); // set pin to input 
-	PORTD &= ~(_BV(PORT2)|_BV(PORT3)); // disable pull-up
-
-
-	sei();
-
-
+    
 
 	/*
 	 * Writing slave address
@@ -124,9 +109,12 @@ void xarias_ac_init()
 	// Setting PB1 pin as output for main board interrupt generator
 	DDRB |= _BV(1);
 
-	//Setting keyboard pins as input
+	// Setting door pins as input
 	DDRD &= ~( _BV(0) | _BV(1));
 	DDRC &= ~( _BV(0) | _BV(1) | _BV(2) | _BV(3) );
+	// Enabling internal pullups on door pins
+	PORTD |= ( _BV(0) | _BV(1));
+	PORTC |= ( _BV(0) | _BV(1) | _BV(2) | _BV(3) );
 
 	uint8_t try=0;
 
@@ -139,6 +127,22 @@ void xarias_ac_init()
 				crc_ok = false;
 		try++;
 	} while (!crc_ok && try<MAX_1WIRE_TRIES);
+
+	/*
+	 * Enable external interrupt 0 and 1
+	 */
+	GICR = _BV(INT0);
+	/*
+	 * Falling edge will generate interrupt 0 and 
+	 * any logical change will generate interrupt 1
+	 */
+	MCUCR |= _BV(ISC01) | _BV(ISC10);
+	DDRD  &= ~(_BV(PORT2)|_BV(PORT3)); // set pin to input 
+	PORTD &= ~(_BV(PORT2)|_BV(PORT3)); // disable pull-up
+
+
+	sei();
+
 	
 }
 
@@ -196,24 +200,39 @@ void ac_set_blower_power(uint8_t power)
 	if(power > 100) power=100;
 
 	OCR2=AC_BLOWER_PMAX-((uint16_t)(AC_BLOWER_PMAX-AC_BLOWER_PMIN))*power/100;
-//	OCR2=160;
 }
 
 void ac_control_auto()
 {
+	uint8_t blower_power;
 	#define AC_DELTA_BOTTOM		3
-	#define AC_DELTA_UP		2
-	#define AC_MAX_BLOWER_TDELTA 	12
+	#define AC_DELTA_UP		5
+	#define AC_MAX_BLOWER_TDELTA 	8
+	#define AC_MAX_INOUT_TDELTA 	6
 	#define MAX(a,b) ((a)>(b)?(a):(b))
 	#define MIN(a,b) ((a)<(b)?(a):(b))
 
 	if( (ac_mode & (_BV(AC_MODE)|_BV(AC_ONOFF)) ) == (_BV(AC_MODE)|_BV(AC_ONOFF)) )
 	{
-		if(temp[AC_TEMP_IN_AVG] > ac_desired_temp+_BV(4)-AC_DELTA_UP)
+		if(temp[AC_TEMP_IN_AVG] > ac_desired_temp+(1<<4)-AC_DELTA_UP)
 		{
-			ac_set_blower_power(
-				(MIN(temp[AC_TEMP_IN_AVG]-ac_desired_temp,AC_MAX_BLOWER_TDELTA<<4)*100)
-				/ ((AC_MAX_BLOWER_TDELTA<<4)));
+			/*
+			 * Now we're calculating the blower power to be set.
+			 * First of all we take the difference between desired AC temperature and what we have inside.
+			 * The greater is the difference, the greater is blower power. Maximum difference when the 
+			 * blower power is set to 100% is defined by AC_MAX_BLOWER_TDELTA 
+			 */
+			blower_power = (MIN(MAX(temp[AC_TEMP_IN_AVG]-ac_desired_temp,0),AC_MAX_BLOWER_TDELTA<<4)*100) 
+					/ ((AC_MAX_BLOWER_TDELTA<<4));
+			/*
+			 * In the next step we alse should take into account outside temperature.
+			 * If the outside temperature is too high we also should increase blower power.
+			 * Every one celsius degree of difference higher than AC_MAX_INOUT_TDELTA increases 
+			 * blower power by 6%.
+			 */
+			blower_power += MIN((MAX(temp[AC_TEMP_OUT_AVG]-ac_desired_temp-(AC_MAX_INOUT_TDELTA<<4),0)*6) >>4, 100);
+
+			ac_set_blower_power(blower_power);
 			TURN_AC_ON();
 		}
 		if(temp[AC_TEMP_IN_AVG] < ac_desired_temp+AC_DELTA_BOTTOM)
@@ -444,6 +463,9 @@ SIGNAL(SIG_INTERRUPT0)
 	static uint16_t clock_ticks=0;
 	uint8_t i;
 	static uint16_t interval=0, duration=0;
+	static uint8_t prev_doors_state=0;
+	uint8_t doors_state;
+
 
 	if(beep_count)
 	{
@@ -487,6 +509,24 @@ SIGNAL(SIG_INTERRUPT0)
 
 	}
 
+	if(clock_ticks==10000 || clock_ticks==20000 || clock_ticks==30000)
+	{
+		doors_state=get_doors_state();
+
+		if(doors_state!=prev_doors_state)
+		{
+			_delay_us(50);
+			if(doors_state==get_doors_state())
+			{
+				prev_doors_state=doors_state;
+				PORTB |= _BV(1);
+				_delay_us(2);
+				PORTB &= ~_BV(1);
+			}
+		}
+		
+	}
+
 	clock_ticks++;
 	if(clock_ticks==32768)
 	{
@@ -495,34 +535,3 @@ SIGNAL(SIG_INTERRUPT0)
 
 }
 
-// Doors open interrupt
-SIGNAL(SIG_INTERRUPT1)
-{
-	static bool all_doors_closed=true;
-	return;
-	/*
-	 * Interrupt on main board is generated through PB1
-	 */
-	if(get_doors_state())
-	{
-		if(all_doors_closed)
-		{
-			_delay_us(100);
-			if(get_doors_state())
-			{
-				all_doors_closed=false;
-				PORTB |= _BV(1);
-				_delay_us(2);
-				PORTB &= ~_BV(1);
-			}
-		}
-	}
-	else
-	{
-		_delay_us(100);
-		if(!get_doors_state())
-		{
-			all_doors_closed=true;;
-		}
-	}
-}
