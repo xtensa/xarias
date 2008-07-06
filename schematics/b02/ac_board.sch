@@ -33,7 +33,7 @@ device=RESISTOR
 T 66000 52275 5 10 1 1 0 0 1
 refdes=R101
 T 65925 52030 5 10 1 1 0 0 1
-value=4K7
+value=680
 T 65650 52000 5 10 0 0 0 0 1
 footprint=RN55_type_0.1W_Resistor
 }
@@ -973,7 +973,7 @@ A/C BOARD - XARIAS project
 T 67225 46925 10 16 1 0 0 0 1
 Licensed under the TAPR Open Hardware License (www.tapr.org/OHL)
 T 73050 46250 9 16 1 0 0 0 1
-Version: v0.1
+Version: v0.2
 T 73075 45750 9 16 1 0 0 0 1
 Author: R.Pszonczenko
 T 52800 50300 9 10 1 0 0 0 1
