@@ -206,7 +206,7 @@ void onew_search_addresses()
 			}
 
 			/*
-			 * Rewrite all before conflict
+			 * Rewrite all bits before conflict bit
 			 */
 			for(j=0;j<i;j++)
 			{
