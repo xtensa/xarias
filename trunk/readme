@@ -1,6 +1,6 @@
 Copyright (C) 2007 Roman Pszonczenko
-romka [~at~] kolos [~dot~] math [~dot~] uni [~dot~] lodz [~dot~] pl
- 
+xtensa {~at~} go0ogle mail
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 3
@@ -18,21 +18,38 @@ USA.
 
 
 
-Version v0.1 is capable of the following:
- - momentary and average speed measurement
- - time of the journey
- - momentary and average fuel consumption
- - passed distance
+XARIAS v0.2 main functionality:
+ - calculating speed, fuel consumption, engine RPM;
+ - gathering numerous journey statistics, including journey time, distance, 
+   average speed and fuel consumption, total fuel consumed and cost;
+ - external and internal temperatures displayed;
+ - automatic AC control (separate board developed) with smooth blower speed regulation;
+ - openned doors information;
+ - all the information is kept even if the power fails (internal non-volatile 
+   memory of DS1307 with battery support is used);
+ - graphical LCD with KS0108 driver is supported;
+ - 4x3 keyboard added;
+ - I2C external interface added so that you can add external modules;
+ - Automatic Air Conditioning system developed as an external module; 
+ - 1-Wire devices are supported on AC board.
+
+XARIAS v0.1 is capable of the following:
+ - momentary and average speed measurement;
+ - time of the journey;
+ - momentary and average fuel consumption;
+ - passed distance;
+ - text LCD is supported (only Hitachi hd44780 compatible).
 
 
 
 
 HARDWARE:
 
-Hardware is designed with gEDA suite. All sources are available in 
-"<xarias_root>/schematics/" directory.  You can find particular 
-boards schematics in "<xarias_root>/schematics/bXX/" directories 
-('b' comes from "board"). For details of specific board please see 
+Hardware is designed with gEDA suite (http://www.geda.seul.org/). 
+All sources are available in "<xarias_root>/schematics/" directory.  
+You can find particular boards schematics in 
+"<xarias_root>/schematics/bXX/" directories ('b' comes from "board"). 
+For details of specific board please see 
 "<xarias_root>/schematics/bXX/readme" file.
 
 XARIAS project is not the single board. As the project develops new
@@ -48,10 +65,14 @@ WARNING: please take a note, that you should edit
 
 FIRMWARE:
 
-To be able to compile the firmware you have to have installed 
+To be able to compile the firmware you need to have installed 
 avr-gcc cross-compiler and avr-libc libraries. For more information
 please refer to http://www.nongnu.org/avr-libc/
 and http://www.avrfreaks.net/wiki/index.php/Documentation:AVR_GCC
 
 
-For more information please refer to: http://xarias.googlecode.com/
+
+----
+For more information about XARIAS embedded car computer system 
+please visit: http://xarias.googlecode.com/
+
