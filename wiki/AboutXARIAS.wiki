@@ -4,7 +4,7 @@
 
 = Introduction =
 
-XARIAS is embeded system that runs under Atmel's ATmega32 MCU control. It is designed to gain different information from your car and display it in human-readable form.
+XARIAS is embeded system that runs under Atmel's ATmega32 MCU control. It is designed to gain different information from your car and display it in human-readable form. You can install Xarias in any gasoline powered car (except old carburettor cars). Xarias should work properly with LPG engines but this was not tested yet. All test was made on Toyota Corolla E10 '97.
 
 [http://lh6.ggpht.com/xtensa/SGq1u_mMI2I/AAAAAAAABlc/kVrQHKuW6UE/P1160466.jpg?imgmax=720]
 
