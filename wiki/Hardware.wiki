@@ -1,4 +1,4 @@
-#summary One-sentence summary of this page.
+#summary Hardware description of the XARIAS project
 
 *Other pages:* [AboutXARIAS], [Functionality], [Hardware], [SourceCode], [Author]
 
