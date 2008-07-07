@@ -1,3 +1,23 @@
+#
+# XARIAS carputer project
+#
+# Copyright (c) 2008 by Roman Pszonczenko xtensa <_at_> go0ogle mail
+#
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+#
+
 
 
 # Program prefix
@@ -46,11 +66,11 @@ TARGET	       = $(patsubst %_b02.o,%.c,$(T2))
 
 
 help:
-	@echo "Usage: make XXX        - build firmware for XXX xarias board"
-	@echo "       make inst_XXX   - build and install firmware for XXX board"
-	@echo "       make fuses_XXX  - write fuse bits"
+	@echo "Usage: make X        - build firmware for X xarias board"
+	@echo "       make inst_X   - build and install firmware for X board"
+	@echo "       make fuses_X  - write fuse bits"
 	@echo "Possible boards are b01, b02 and ac"
-	@echo "See README for more info"
+	@echo "Visit http://xarias.googlecode.com/ for more info"
 
 %:
 	@echo "Invalid make target: $@"
