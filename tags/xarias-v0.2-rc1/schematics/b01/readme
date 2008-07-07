@@ -1,0 +1,41 @@
+Licensed under the TAPR Open Hardware License
+Copyright 2007 TAPR (c) http://www.tapr.org/OHL
+
+Please use gEDA suite to view/edit attached schematics
+
+WARNING: please take a note, that you should edit 
+"<xarias_root>/schematics/bXX/gafrc" to point correctly to your
+"<xarias_root>/schematics/symbols" directory.
+
+
+
+
+GENERAL DESCRIPTION
+
+This hardware (widely known as carputer) is developed to allow 
+you to get lots of useful information about your car. 
+
+XARIAS could easily be adapted to use in every gasoline powered
+car with electronically controlled injection time. This 
+version was tested on Toyota Corolla EEA100 (E10) with 4EFE
+engine. This engine has 4 injectors connected paralelly.
+It means, that one impulse open all 4 injectors at the time. 
+The time of opening is measured on "Injector" input and 
+multiplied by 4 to get correct result. If your engine has 
+separately connected injectors you have two solutions. 
+
+The first, and the easiest one, is to measure the time of opening 
+only on one of them and then multiply it by 4, as opening times 
+are very similiar on different valves at the same small period 
+of time. 
+
+The second is to make as much inputs as you have injectors and 
+calculate opening time on each of them. This option is not supported 
+by XARIAS at the moment.
+
+For more information please refer to: http://xarias.googlecode.com/
+
+If you have any comments, suggestions or questions you can send me 
+a word to:
+romka [~at~] kolos [~dot~] math [~dot~] uni [~dot~] lodz [~dot~] pl
+
