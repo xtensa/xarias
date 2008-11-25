@@ -25,9 +25,15 @@
 
 /*
  * 1-Wire port settings
+ * Shoud be defined during compilation
  */
-#define ONEW_P_BUS_PORT		B
-#define ONEW_BUS_PORT		0
+// for AC board
+//#define ONEW_P_BUS_PORT	B
+//#define ONEW_BUS_PORT		0
+
+// for main board
+//#define ONEW_P_BUS_PORT	B
+//#define ONEW_BUS_PORT		4
 
 /*
  * The number of allowed devices on 1-wire
@@ -36,11 +42,11 @@
 
 #define MAX_1WIRE_TRIES		10
 
-uint8_t onew_calc_crc(uint8_t *p, uint8_t len);
-uint8_t onew_dev_list[ONEW_MAX_DEVICE_COUNT][8];
-uint8_t onew_dev_num;
+extern uint8_t onew_dev_list[ONEW_MAX_DEVICE_COUNT][8];
+extern uint8_t onew_dev_num;
 
 void onew_search_addresses();
+uint8_t onew_calc_crc(uint8_t *p, uint8_t len);
 
 void ds18b20_convert_temp(uint8_t dev); 
 int16_t ds18b20_read_temp(uint8_t dev);
