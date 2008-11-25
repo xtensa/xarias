@@ -36,6 +36,7 @@
 #include "xarias_ac.h"
 #include "gLCD.h"
 #include "twi_devs.h"
+#include "one_wire.h"
 //#include "../utils/out.h"
 
 #define PIN_INJ   PIND&_BV(3)
@@ -64,6 +65,9 @@
 
 //#define KB_SET(i)   kb_state |=  _BV(i)
 //#define KB_UNSET(i) kb_state &= ~_BV(i)
+
+//extern uint8_t onew_dev_list[ONEW_MAX_DEVICE_COUNT][8];
+//extern uint8_t onew_dev_num;
 
 /*
  * Main menu variables and constants.
@@ -94,7 +98,7 @@ uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED, doors_state
 /*
  * The following variable is used to store current working mode
  */
-uint8_t modestate = MODE_SPEED;
+uint8_t modestate = MODE_SENSORS_INFO;
 
 
 
@@ -158,7 +162,7 @@ void draw_frame01();
  * If DS1307 has correct data, these values will be 
  * updated.
  */
-uint8_t contrast=104, brightness=80;
+uint8_t contrast=120, brightness=110;
 char *currency=" EU";
 uint8_t temp_ac=17;
 
@@ -348,32 +352,6 @@ void error(uint8_t errcode)
 }
 
 
-void ac_send_cmd(uint8_t ac_cmd)
-{
-	uint8_t length=1;
-
-	twi_data_buf[0]=ac_cmd;
-	switch(ac_cmd)
-	{
-		case AC_CMD_SET_MODE: 
-		{
-			twi_data_buf[1]=(aflags&3); // first two bits contain what we need
-			length=2;
-		} break;
-		case AC_CMD_WRITE_TEMP:
-		{
-			int32_t t=((int32_t)temp_ac)*10000;
-			twi_data_buf[1] = 1; // temp_ac is always in Celsius
-			twi_data_buf[2] = (uint8_t)(t&0xFF);
-			twi_data_buf[3] = (uint8_t)((t>>8)&0xFF);
-			twi_data_buf[4] = (uint8_t)((t>>16)&0xFF);
-			twi_data_buf[5] = (uint8_t)((t>>24)&0xFF);
-			length=6;
-		} break;
-	}
-	twi_write_str(TWIADDR_AC,length,true);
-	_delay_us(10);
-}
 
 void save_aflags(uint8_t send_to_ac)
 {
@@ -381,45 +359,8 @@ void save_aflags(uint8_t send_to_ac)
 	twi_data_buf[1] = aflags;
 	twi_write_str(TWIADDR_DS1307, 2, true );
 
-	if(send_to_ac) ac_send_cmd(AC_CMD_SET_MODE);
 }
 
-
-void ac_get_doors_state()
-{
-	twi_data_buf[0]=AC_CMD_GET_DOORS;
-	twi_write_str(TWIADDR_AC,1,false);
-	twi_read_str(TWIADDR_AC,1,true);
-	doors_state=twi_data_buf[0];
-}
-
-
-int32_t ac_get_temp(uint8_t sensor_no, int8_t *sign)
-{
-	int32_t temp;
-	twi_data_buf[0]=AC_CMD_READ_TEMP;
-	twi_data_buf[1]=sensor_no;
-	twi_data_buf[2]=AFLAGS_ISSET(FLAG_IS_CELSIUS);
-
-	twi_write_str(TWIADDR_AC,3,false);
-	twi_read_str(TWIADDR_AC,4,true);
-	_delay_us(10);
-	
-	temp =	(((int32_t)twi_data_buf[0])      ) |
-		(((int32_t)twi_data_buf[1]) << 8 ) |
-		(((int32_t)twi_data_buf[2]) << 16) |
-		(((int32_t)twi_data_buf[3]) << 24) 
-		;
-
-	if(temp<0)
-	{
-		*sign=-1;
-		temp*=-1;
-	}
-	else *sign=1;
-
-	return temp;
-}
 
 void save_passed_data()
 {
@@ -524,6 +465,11 @@ static void xarias_init(void)
 	twi_data_buf[0] = 0x08;
 	twi_write_str(TWIADDR_DS1307,1,false); // sending start address to read from
 	twi_read_str(TWIADDR_DS1307,3,false);
+
+
+
+	onew_search_addresses();
+
 	/*
 	 * DS1307 memory map:
 	 * 	0x08-0x0A : control byte (sum of two previous bytes)
@@ -539,7 +485,7 @@ static void xarias_init(void)
 	 *	0x1D-0x20 : passed_speed_ticks
 	 *	0x21-0x24 : passed_seconds
 	 */
-	if((uint8_t)(twi_data_buf[0]+twi_data_buf[1])!=twi_data_buf[2] || (!twi_data_buf[0] && !twi_data_buf[1]) )
+	if(1)// (uint8_t)(twi_data_buf[0]+twi_data_buf[1])!=twi_data_buf[2] || (!twi_data_buf[0] && !twi_data_buf[1]) )
 	{
 		_delay_us(5); // wait a little bit before next TWI operation
 		
@@ -639,8 +585,8 @@ static void xarias_init(void)
 	/*
 	 * Setting up AC mode and ending desired temperature 
 	 */
-	ac_send_cmd(AC_CMD_SET_MODE);
-	ac_send_cmd(AC_CMD_WRITE_TEMP);
+	//ac_send_cmd(AC_CMD_SET_MODE);
+	//ac_send_cmd(AC_CMD_WRITE_TEMP);
 
 
 	/*
@@ -823,7 +769,20 @@ uint32_t litres_to_gallons(uint32_t l)
 
 
 
+int32_t ac_get_temp(uint8_t dev, int8_t *sign)
+{
+	int32_t temp=ds18b20_read_temp(dev);
+	ds18b20_convert_temp(dev);
 
+	temp=ds18b20_temp_to_decimal(temp);
+	if(temp<0)
+	{
+		*sign=-1;
+		temp*=-1;
+	}
+	else *sign=1;
+	return temp;
+}
 
 
 
@@ -855,7 +814,7 @@ void if_draw_progressbar(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t
 
 uint8_t inline kb_column_getstate(uint8_t col)
 {
-	if(col==0) return B02_GETSTATE(KB_COL1);
+//	if(col==0) return B02_GETSTATE(KB_COL1);
 	if(col==1) return B02_GETSTATE(KB_COL2);
 	if(col==2) return B02_GETSTATE(KB_COL3);
 	if(col==3) return B02_GETSTATE(KB_COL4);
@@ -889,7 +848,6 @@ void draw_frame01()
 void draw_acinfo()
 {
 	char str_temp='F';
-	int8_t sign;
 	
 	if(!IS_MODE_MAIN(modestate)) return;
 
@@ -922,18 +880,18 @@ void draw_acinfo()
 	/*
 	 * Inside/Outside temperature
 	 */
-	temp_in  = ac_get_temp(AC_TEMP_IN_AVG, &sign);
-	temp_out = ac_get_temp(AC_TEMP_OUT_AVG, &sign);
+//	temp_in  = ac_get_temp(AC_TEMP_IN_AVG);
+//	temp_out = ac_get_temp(AC_TEMP_OUT_AVG);
 	
 	gLCD_locate(103,29);
 	printf_P(PSTR("In"));
 	gLCD_locate(91,37);
-	printf_P(PSTR("%3d^%c"),sign*(int8_t)ROUND1(temp_in,4,4),str_temp);
+	printf_P(PSTR("%3d^%c"),(int8_t)ROUND1(temp_in,4,4),str_temp);
 	gLCD_line(89,45,127,45,true);
 	gLCD_locate(103,47);
 	printf_P(PSTR("Out"));
 	gLCD_locate(91,55);
-	printf_P(PSTR("%3d^%c"),sign*(int8_t)ROUND1(temp_out,4,4),str_temp);
+	printf_P(PSTR("%3d^%c"),(int8_t)ROUND1(temp_out,4,4),str_temp);
 }
 
 void draw_clock()
@@ -1107,7 +1065,7 @@ while(f==g)
 						i=1;
 					}
 				*/
-					ac_get_doors_state();
+				//	ac_get_doors_state();
 					set_mode(MODE_DOORS_STATE);
 				}
 				
@@ -1150,7 +1108,7 @@ while(f==g)
 					if(inc)
 					{
 						temp_ac+=inc;
-						ac_send_cmd(AC_CMD_WRITE_TEMP);
+						//ac_send_cmd(AC_CMD_WRITE_TEMP);
 
 						twi_data_buf[0] = 0x13;
 						twi_data_buf[1] = temp_ac;
@@ -1963,7 +1921,7 @@ while(f==g)
 					{
 						temp=ac_get_temp(i, &sign);
 						gLCD_locate(2,10*i+23);
-						printf_P(PSTR("Sensor %d :%4d.%d^%c"),i,sign*ROUND1(temp,4,1),ROUND2(temp,4,1),str_temp);
+						printf_P(PSTR("Sensor %d :%4d.%d^%c"),i,ROUND1(temp,4,1),ROUND2(temp,4,1),str_temp);
 					}
 	
 					
@@ -1986,46 +1944,38 @@ while(f==g)
 				case MODE_SENSORS_INFO:
 				{
 					int32_t temp;
-					uint8_t dev_num;
-					int8_t sign;
+					int8_t  sign;
 
 					gLCD_frame(0,0,127,63,1,true);
 					gLCD_locate(2,2);
 					printf_P(PSTR("1-WIRE DEVICE INFO"));
 
-					//-----------------
-					twi_data_buf[0]=AC_CMD_GET_1W_DEVS;
-					twi_write_str(TWIADDR_AC,1,false);
-					twi_read_str(TWIADDR_AC,1,true);
-					dev_num=twi_data_buf[0];
+					if(!onew_dev_num) onew_search_addresses();
 					
-					twi_read_str(TWIADDR_AC,8*dev_num,true);
-
 					gLCD_locate(2,12);
-					printf_P(PSTR("Found %u devices"),dev_num);
+					printf_P(PSTR("Found %u devices"),onew_dev_num);
 				
-					j=((dev_num+1)/2);
-					func_pos %= j;
-					
-					for(i=func_pos*2;i<func_pos*2+2 && i<dev_num;i++)
+					for(i=0;i<onew_dev_num;i++)
 					{
 						
 						gLCD_locate(2,16*(i%2)+23);
 						printf_P(PSTR("D%u:%02x%02x%02x%02x%02x%02x%02x%02x"),
 							i,
-							twi_data_buf[i*8+7],
-							twi_data_buf[i*8+6],
-							twi_data_buf[i*8+5],
-							twi_data_buf[i*8+4],
-							twi_data_buf[i*8+3],
-							twi_data_buf[i*8+2],
-							twi_data_buf[i*8+1],
-							twi_data_buf[i*8+0]);
+							onew_dev_list[i][7],
+							onew_dev_list[i][6],
+							onew_dev_list[i][5],
+							onew_dev_list[i][4],
+							onew_dev_list[i][3],
+							onew_dev_list[i][2],
+							onew_dev_list[i][1],
+							onew_dev_list[i][0]);
 
-						temp=ac_get_temp(i,&sign);
+						temp=ac_get_temp(i, &sign);
 						gLCD_locate(2,16*(i%2)+31);
 						printf_P(PSTR("t: %4d.%04d^%c"),sign*ROUND1(temp,4,4), ROUND2(temp,4,4),str_temp);
 					}
+					gLCD_locate(2,55);
+					printf_P(PSTR("test"));
 
  				} break;
 
@@ -2383,7 +2333,7 @@ SIGNAL(SIG_INTERRUPT2)
 	uint8_t old_progpart=prog_part;
 
 	prog_part=PROGPART_DOORS_STATE;
-	ac_get_doors_state();
+//	ac_get_doors_state();
 
 	if(IS_MODE_MAIN(modestate) || modestate==MODE_DOORS_STATE)
 	{

@@ -38,6 +38,8 @@ AC_F_CPU          = 8000000UL
 OBJ_B01        = xarias_b01.o hd44780_b01.o lcd_b01.o
 OBJ_B02        = xarias_b02.o s6b0108_b02.o gLCD_b02.o twi_devs_b02.o
 OBJ_AC         = xarias_ac.o one_wire_ac.o #twi_slave_ac.o 
+OBJ_B02L       = xarias_b02l.o s6b0108_b02l.o gLCD_b02l.o twi_devs_b02l.o one_wire_b02l.o
+
 OPTIMIZE       = -Os -mcall-prologues
 
 
@@ -54,7 +56,8 @@ OBJDUMP        = avr-objdump
 
 CFLAGS        += $(if $(findstring _b01,$@),-mmcu=${MAIN_MCU_TARGET} -D F_CPU=${MAIN_F_CPU},)
 CFLAGS        += $(if $(findstring _b02,$@),-mmcu=${MAIN_MCU_TARGET} -D F_CPU=${MAIN_F_CPU},)
-CFLAGS        += $(if $(findstring _ac,$@),-mmcu=${AC_MCU_TARGET} -D F_CPU=${AC_F_CPU},)
+CFLAGS        += $(if $(findstring _b02l,$@),-D ONEW_P_BUS_PORT=B -D ONEW_BUS_PORT=4,)
+CFLAGS        += $(if $(findstring _ac,$@),-mmcu=${AC_MCU_TARGET} -D F_CPU=${AC_F_CPU} -D ONEW_P_BUS_PORT=B -D ONEW_BUS_PORT=0,)
 
 LFUSE          = $(if $(findstring _ac,$@),FF,FF)
 HFUSE          = $(if $(findstring _ac,$@),D9,CF)
@@ -62,14 +65,15 @@ AVRTARGET      = $(if $(findstring _ac,$@),m8,m32)
 
 T1	       = $(patsubst %_ac.o,%.c,$@)
 T2	       = $(patsubst %_b01.o,%.c,$(T1))
-TARGET	       = $(patsubst %_b02.o,%.c,$(T2))
+T3	       = $(patsubst %_b02.o,%.c,$(T2))
+TARGET	       = $(patsubst %_b02l.o,%.c,$(T3))
 
 
 help:
 	@echo "Usage: make X        - build firmware for X xarias board"
 	@echo "       make inst_X   - build and install firmware for X board"
 	@echo "       make fuses_X  - write fuse bits"
-	@echo "Possible boards are b01, b02 and ac"
+	@echo "Possible boards are b01, b02, b02l and ac"
 	@echo "Visit http://xarias.googlecode.com/ for more info"
 
 %:
@@ -92,13 +96,16 @@ xarias_%.o: xarias_%.c xarias_%.h
 %.o: prereqs_% 
 	$(CC) $(CFLAGS) -c $(TARGET) -o $@
 
-prereqs_%_ac prereqs_%_b01 prereqs_%_b02: %.c %.h
+prereqs_%_ac prereqs_%_b01 prereqs_%_b02 prereqs_%_b02l: %.c %.h
 	@cat /dev/null	
 
 b01: ${PRG}_b01.bin ${PRG}_b01.hex info_${PRG}_b01
 	@cat /dev/null	
 
 b02: ${PRG}_b02.bin ${PRG}_b02.hex info_${PRG}_b02
+	@cat /dev/null	
+
+b02l: ${PRG}_b02l.bin ${PRG}_b02l.hex info_${PRG}_b02l
 	@cat /dev/null	
 
 ac:  ${PRG}_ac.bin ${PRG}_ac.hex info_${PRG}_ac
@@ -108,6 +115,9 @@ xarias_b01.elf: ${OBJ_B01}
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 xarias_b02.elf: ${OBJ_B02}
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+xarias_b02l.elf: ${OBJ_B02L}
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 xarias_ac.elf: ${OBJ_AC}

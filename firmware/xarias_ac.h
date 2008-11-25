@@ -73,7 +73,7 @@
 /*
  * This command just makes <beeps_number> beeps of tone <tone>.
  * You can adjust duration and interval of beeps: 255 = 5 secs
- * 	params(4): tone, beeps_number, duration, interval
+ * 	params(4): beeps_number, tone, duration, interval
  */
 
 

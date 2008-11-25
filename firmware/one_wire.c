@@ -112,6 +112,7 @@ uint8_t onew_read_bit()
 	ONEW_BUS_PULL_DOWN();
 	_delay_us(2);
 
+	ONEW_BUS_PULL_UP(); 
 	ONEW_BUS_SET_INPUT();
 	_delay_us(9); // waiting for respond (<15us)
 	result = ONEW_BUS_GET_STATE(); 
