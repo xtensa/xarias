@@ -390,7 +390,7 @@ SIGNAL(SIG_2WIRE_SERIAL)
 				ac_control_auto();
 				ret_vals_cnt=0;
 			}
-
+/* orig
 			if(cmd==AC_CMD_GET_1W_DEVS && byte_no==0)
 			{
 				//onew_search_addresses();
@@ -404,6 +404,24 @@ SIGNAL(SIG_2WIRE_SERIAL)
 					}
 				}
 				ret_vals_cnt = onew_dev_num*8+1;
+			}
+*/
+			if(cmd==AC_CMD_GET_1W_DEVS_CNT && byte_no==0)
+			{
+				//onew_search_addresses();
+				
+				ret_vals[0] = onew_dev_num;
+				ret_vals_cnt = 1;
+			}
+			if(cmd==AC_CMD_GET_1W_DEVS_ADDR && byte_no==1)
+			{
+				//onew_search_addresses();
+				
+				for(j=0;j<8;j++)
+				{
+					ret_vals[j] = onew_dev_list[params[0]][j];
+				}
+				ret_vals_cnt = 8;
 			}
 
 			if(cmd==AC_CMD_GET_DOORS && byte_no==0)

@@ -57,19 +57,24 @@
  * 	params(1): mode_mask; 
  * 	return(0): none 
  */
-#define AC_CMD_GET_1W_DEVS 	0x94 
-/* This command returns all available devices on the 1-wire bus.
+#define AC_CMD_GET_1W_DEVS_CNT 	0x94 
+/* This command returns number of available devices on the 1-wire bus.
  * 	params(0): none
- * 	return(?): byte 1 - number of detected devices, than 8 bytes for each device 
+ * 	return(1): byte 1 - number of detected devices
  */
-#define AC_CMD_GET_DOORS	0x95
+#define AC_CMD_GET_1W_DEVS_ADDR	0x95 
+/* This command returns address of the specified device on 1-wire bus.
+ * 	params(1): byte 1 - device number
+ * 	return(8): byte 0-7 - address of the device
+ */
+#define AC_CMD_GET_DOORS	0x96
 /*
  * This command gets no parameters and return 1 byte - the mask of opened doors
  * in which every bit indicates on door. 1 - is open, 0 - is closed
  * 	params(0): none
  * 	return(1): opened doors bitmask
  */
-#define AC_CMD_MAKE_BEEPS	0x96
+#define AC_CMD_MAKE_BEEPS	0x97
 /*
  * This command just makes <beeps_number> beeps of tone <tone>.
  * You can adjust duration and interval of beeps: 255 = 5 secs

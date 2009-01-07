@@ -28,11 +28,11 @@
 
 
 // ROM commands
-#define DS18B20_ROM_SEARCH			0xF0
-#define DS18B20_ROM_READ			0x33
-#define DS18B20_ROM_MATCH			0x55
-#define DS18B20_ROM_SKIP			0xCC
-#define DS18B20_ROM_ALARM_SEARCH		0xEC
+#define DS18B20_ROM_SEARCH		0xF0
+#define DS18B20_ROM_READ		0x33
+#define DS18B20_ROM_MATCH		0x55
+#define DS18B20_ROM_SKIP		0xCC
+#define DS18B20_ROM_ALARM_SEARCH	0xEC
 
 #define DS18B20_CMD_CONVERT 		0x44
 #define DS18B20_CMD_READ_SCRATCHPAD	0xBE
@@ -40,7 +40,6 @@
 #define DS18B20_CMD_COPY_SCRATCHPAD	0x48
 #define DS18B20_CMD_RECALL_E2		0xB8
 #define DS18B20_CMD_READ_POWER_SUPP	0xB4
-
 
 #define MERGE(a,b) a##b
 #define DUMMY(a,b) MERGE(a,b)
@@ -140,7 +139,6 @@ uint8_t onew_read_byte()
 	}
 	return byte;
 }
-
 
 uint8_t onew_calc_crc(uint8_t *p, uint8_t len)
 {
@@ -273,6 +271,17 @@ void onew_write_addr(uint8_t dev)
 		onew_write_byte(onew_dev_list[dev][j]);
 	}
 }
+
+void ds18b20_write_scratchpad(uint8_t dev, uint8_t th, uint8_t tl, uint8_t control)
+{
+	onew_write_byte(DS18B20_ROM_MATCH);
+	onew_write_addr(dev);
+	onew_write_byte(DS18B20_CMD_WRITE_SCRATCHPAD);
+	onew_write_byte(th); // TH
+	onew_write_byte(tl); // TL
+	onew_write_byte(control);
+}
+
 
 void ds18b20_convert_temp(uint8_t dev) 
 {

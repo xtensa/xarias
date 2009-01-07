@@ -76,17 +76,18 @@ char mainmenu_strings[6][19]={	"Trip settings",
 				"Service mode",
 				"Exit"};
 
-#define MODE_TRIP_SETTINGS	0x00
-#define MODE_DATETIME_SETTINGS	0x01
-#define MODE_SCREEN_ADJUST	0x02
-#define MODE_AIRCON_SETTINGS	0x03
-#define MODE_SERVICE		0x04
-#define MODE_TRIP		0x05
-#define MODE_MENU		0x06
-#define MODE_FUEL		0x07
-#define MODE_SPEED		0x08
-#define MODE_RPM		0x09
-#define MODE_DOORS_STATE	0x0A
+#define MODE_NONE		0x00
+#define MODE_TRIP_SETTINGS	0x01
+#define MODE_DATETIME_SETTINGS	0x02
+#define MODE_SCREEN_ADJUST	0x03
+#define MODE_AIRCON_SETTINGS	0x04
+#define MODE_SERVICE		0x05
+#define MODE_TRIP		0x06
+#define MODE_MENU		0x07
+#define MODE_FUEL		0x08
+#define MODE_SPEED		0x09
+#define MODE_RPM		0x0A
+#define MODE_DOORS_STATE	0x0B
 
 #define MODE_SENSORS_INFO	0xF0
 uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED, doors_state=0;
@@ -96,6 +97,11 @@ uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED, doors_state
  */
 uint8_t modestate = MODE_SPEED;
 
+
+/*
+ * This variable is used to set future mode
+ */
+uint8_t modestate_next = MODE_NONE;
 
 
 /*
@@ -171,7 +177,6 @@ volatile uint16_t last_inj_ticks=0, rpm_ticks=0, clock_ticks=0, speed_ticks=0;
 bool is12h;
 uint8_t seconds, minutes, hours, day, date, month, year;
 char *pmstr="PM";
-int32_t temp_out, temp_in;
 
 /*
  * Such number of ticks gives us INJ_FLOW ml fuel consumed
@@ -803,7 +808,7 @@ uint32_t calc_fuel_total()
  * Formula: 
  * 	speed = (l_speed_ticks*1000) / (SPEED_TICKS * seconds)
  */
-uint16_t calc_speed_m()
+uint16_t inline calc_speed_m()
 {
 	return (uint16_t)(((uint32_t)speed_ticks)*1000/SPEED_TICKS);
 }
@@ -889,8 +894,7 @@ void draw_frame01()
 void draw_acinfo()
 {
 	char str_temp='F';
-	int8_t sign;
-	
+
 	if(!IS_MODE_MAIN(modestate)) return;
 
 	if(AFLAGS_ISSET(FLAG_IS_CELSIUS)) str_temp='C';
@@ -919,21 +923,33 @@ void draw_acinfo()
 		printf_P(PSTR("OFF"));
 	}
 	gLCD_line(89,27,127,27,true);
-	/*
-	 * Inside/Outside temperature
-	 */
-	temp_in  = ac_get_temp(AC_TEMP_IN_AVG, &sign);
-	temp_out = ac_get_temp(AC_TEMP_OUT_AVG, &sign);
-	
+}
+
+/*
+ * Inside/Outside temperature
+ */
+void draw_tempinfo()
+{
+	int8_t sign;
+	int32_t temp;
+	char str_temp='F';
+
+	if(!IS_MODE_MAIN(modestate)) return;
+
+	if(AFLAGS_ISSET(FLAG_IS_CELSIUS)) str_temp='C';
+		
 	gLCD_locate(103,29);
 	printf_P(PSTR("In"));
 	gLCD_locate(91,37);
-	printf_P(PSTR("%3d^%c"),sign*(int8_t)ROUND1(temp_in,4,4),str_temp);
+	temp  = ac_get_temp(AC_TEMP_IN_AVG, &sign);
+	printf_P(PSTR("%3d^%c"),sign*(int8_t)ROUND1(temp,4,4),str_temp);
+
 	gLCD_line(89,45,127,45,true);
 	gLCD_locate(103,47);
 	printf_P(PSTR("Out"));
 	gLCD_locate(91,55);
-	printf_P(PSTR("%3d^%c"),sign*(int8_t)ROUND1(temp_out,4,4),str_temp);
+	temp = ac_get_temp(AC_TEMP_OUT_AVG, &sign);
+	printf_P(PSTR("%3d^%c"),sign*(int8_t)ROUND1(temp,4,4),str_temp);
 }
 
 void draw_clock()
@@ -1622,6 +1638,9 @@ while(f==g)
 		*/
 
 
+		/*
+		 * Drawing routines
+		 */
 		//if(is_lcd_on && lcd_update)
 		if(lcd_update)
 		{
@@ -1674,7 +1693,6 @@ while(f==g)
 				}
 				tot_cost     = divide(tot_fuel, fuel_cost, 1000);
 			}
-
 
 			switch(modestate)
 			{
@@ -1768,6 +1786,7 @@ while(f==g)
 
 					draw_clock();
 					draw_acinfo();
+					draw_tempinfo();
 
 				} break;
 
@@ -1824,7 +1843,7 @@ while(f==g)
 					printf_P(PSTR("%4u.%02u"),ROUND1(tot_cost,2,2), ROUND2(tot_cost,2,2));
 
 					draw_acinfo();
-
+					draw_tempinfo();
 				
 				} break;
 
@@ -1874,6 +1893,7 @@ while(f==g)
 					*/
 					draw_clock();
 					draw_acinfo();
+					draw_tempinfo();
 				} break;
 
 
@@ -1953,10 +1973,8 @@ while(f==g)
 					gLCD_locate(2,13);
 					printf_P(PSTR("Scale    :%8c"),str_temp);
 
-					twi_data_buf[0]=AC_CMD_GET_1W_DEVS;
+					twi_data_buf[0]=AC_CMD_GET_1W_DEVS_CNT;
 					twi_write_str(TWIADDR_AC,1,false);
-					twi_read_str(TWIADDR_AC,17,true);
-
 					dev_num=twi_data_buf[0];
 					
 					for(i=0;i<dev_num;i++)
@@ -1993,14 +2011,12 @@ while(f==g)
 					gLCD_locate(2,2);
 					printf_P(PSTR("1-WIRE DEVICE INFO"));
 
-					//-----------------
-					twi_data_buf[0]=AC_CMD_GET_1W_DEVS;
+					// getting device count
+					twi_data_buf[0]=AC_CMD_GET_1W_DEVS_CNT;
 					twi_write_str(TWIADDR_AC,1,false);
-					twi_read_str(TWIADDR_AC,1,true);
+					twi_read_str(TWIADDR_AC,1,false);
 					dev_num=twi_data_buf[0];
 					
-					twi_read_str(TWIADDR_AC,8*dev_num,true);
-
 					gLCD_locate(2,12);
 					printf_P(PSTR("Found %u devices"),dev_num);
 				
@@ -2009,18 +2025,22 @@ while(f==g)
 					
 					for(i=func_pos*2;i<func_pos*2+2 && i<dev_num;i++)
 					{
-						
+						twi_data_buf[0]=AC_CMD_GET_1W_DEVS_ADDR;
+						twi_data_buf[1]=i;
+						twi_write_str(TWIADDR_AC,2,false);
+						twi_read_str(TWIADDR_AC,8,(i==dev_num-1));
+
 						gLCD_locate(2,16*(i%2)+23);
 						printf_P(PSTR("D%u:%02x%02x%02x%02x%02x%02x%02x%02x"),
 							i,
-							twi_data_buf[i*8+7],
-							twi_data_buf[i*8+6],
-							twi_data_buf[i*8+5],
-							twi_data_buf[i*8+4],
-							twi_data_buf[i*8+3],
-							twi_data_buf[i*8+2],
-							twi_data_buf[i*8+1],
-							twi_data_buf[i*8+0]);
+							twi_data_buf[7],
+							twi_data_buf[6],
+							twi_data_buf[5],
+							twi_data_buf[4],
+							twi_data_buf[3],
+							twi_data_buf[2],
+							twi_data_buf[1],
+							twi_data_buf[0]);
 
 						temp=ac_get_temp(i,&sign);
 						gLCD_locate(2,16*(i%2)+31);
@@ -2267,11 +2287,19 @@ while(f==g)
 		{
 			if(!mode_changed) _delay_ms(2);
 		}
-	}
+
+		if(modestate_next != MODE_NONE)
+		{
+			set_mode(modestate_next);
+			modestate_next = MODE_NONE;
+		}
+	} // main loop end 
 	return 0;
 }
 
-
+/*
+ * Clock ticks interrupt
+ */
 SIGNAL(SIG_INTERRUPT0)
 {
 	uint8_t pin_inj_state=PIN_INJ, tcnt0, pin_lights_state=PIN_LIGHTS;
@@ -2324,7 +2352,8 @@ SIGNAL(SIG_INTERRUPT0)
 
 
 		// checking for lights state
-		if(rpm_ticks > 600 / RPM_MULTIPLIER && !pin_lights_state)
+		// Inform if engeen speed is greater than 600 RPM and car speed is greater then 3km/h
+		if(rpm_ticks > 600 / RPM_MULTIPLIER && calc_speed_m()*36/10 > 3000 && !pin_lights_state)
 		{
 			twi_data_buf[0]=AC_CMD_MAKE_BEEPS;
 			twi_data_buf[1]=2;
@@ -2378,6 +2407,10 @@ SIGNAL(SIG_INTERRUPT0)
 	}
 }
 
+
+/*
+ * Openned doors interrupt
+ */
 SIGNAL(SIG_INTERRUPT2)
 {
 	uint8_t old_progpart=prog_part;
@@ -2389,11 +2422,11 @@ SIGNAL(SIG_INTERRUPT2)
 	{
 		if(doors_state)
 		{
-			set_mode(MODE_DOORS_STATE);
+			modestate_next = MODE_DOORS_STATE;
 		}
 		else
 		{	
-			set_mode(MODE_MAIN);
+			modestate_next = MODE_MAIN;
 		}
 	}
 
