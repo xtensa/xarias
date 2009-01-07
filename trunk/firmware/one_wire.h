@@ -23,6 +23,11 @@
 #ifndef _ONE_WIRE_H_
 #define _ONE_WIRE_H_
 
+#define DS18B20_RESOLUTION_9		0x1F
+#define DS18B20_RESOLUTION_10		0x3F
+#define DS18B20_RESOLUTION_11		0x5F
+#define DS18B20_RESOLUTION_12		0x7F
+
 /*
  * 1-Wire port settings
  * Shoud be defined during compilation
@@ -35,6 +40,7 @@
 //#define ONEW_P_BUS_PORT	B
 //#define ONEW_BUS_PORT		4
 
+
 /*
  * The number of allowed devices on 1-wire
  */
@@ -45,12 +51,13 @@
 extern uint8_t onew_dev_list[ONEW_MAX_DEVICE_COUNT][8];
 extern uint8_t onew_dev_num;
 
-void onew_search_addresses();
+void 	onew_search_addresses();
 uint8_t onew_calc_crc(uint8_t *p, uint8_t len);
 
-void ds18b20_convert_temp(uint8_t dev); 
+void 	ds18b20_convert_temp(uint8_t dev); 
 int16_t ds18b20_read_temp(uint8_t dev);
 int32_t ds18b20_temp_to_decimal(int16_t temp);
 int16_t ds18b20_temp_from_decimal(int32_t temp);
+void 	ds18b20_write_scratchpad(uint8_t dev, uint8_t th, uint8_t tl, uint8_t control);
 
 #endif

@@ -1911,7 +1911,7 @@ while(f==g)
 					gLCD_locate(2,13);
 					printf_P(PSTR("Scale    :%8c"),str_temp);
 
-					twi_data_buf[0]=AC_CMD_GET_1W_DEVS;
+					// FIXME twi_data_buf[0]=AC_CMD_GET_1W_DEVS;
 					twi_write_str(TWIADDR_AC,1,false);
 					twi_read_str(TWIADDR_AC,17,true);
 
@@ -1950,7 +1950,11 @@ while(f==g)
 					gLCD_locate(2,2);
 					printf_P(PSTR("1-WIRE DEVICE INFO"));
 
-					if(!onew_dev_num) onew_search_addresses();
+					if(!onew_dev_num) 
+					{
+						onew_search_addresses();
+						ds18b20_write_scratchpad(0,0,0,DS18B20_RESOLUTION_9);
+					}
 					
 					gLCD_locate(2,12);
 					printf_P(PSTR("Found %u devices"),onew_dev_num);
