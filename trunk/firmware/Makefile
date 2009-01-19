@@ -24,8 +24,11 @@
 PRG            = xarias
 
 # Programmer settings. Please see avrdude manpage for more details.
-PROGRAMMER     = pony-stk200
-PORT           = /dev/parport0
+#PROGRAMMER     = pony-stk200
+#PORT           = /dev/parport0
+
+PROGRAMMER     = usbasp
+PORT	       = /dev/ttyACM0
 
 # Main board settings
 MAIN_MCU_TARGET     = atmega32
