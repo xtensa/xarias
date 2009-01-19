@@ -76,20 +76,20 @@ char mainmenu_strings[6][19]={	"Trip settings",
 				"Service mode",
 				"Exit"};
 
-#define MODE_NONE		0x00
-#define MODE_TRIP_SETTINGS	0x01
-#define MODE_DATETIME_SETTINGS	0x02
-#define MODE_SCREEN_ADJUST	0x03
-#define MODE_AIRCON_SETTINGS	0x04
-#define MODE_SERVICE		0x05
-#define MODE_TRIP		0x06
-#define MODE_MENU		0x07
-#define MODE_FUEL		0x08
-#define MODE_SPEED		0x09
-#define MODE_RPM		0x0A
-#define MODE_DOORS_STATE	0x0B
+#define MODE_TRIP_SETTINGS	0x00
+#define MODE_DATETIME_SETTINGS	0x01
+#define MODE_SCREEN_ADJUST	0x02
+#define MODE_AIRCON_SETTINGS	0x03
+#define MODE_SERVICE		0x04
+#define MODE_TRIP		0x05
+#define MODE_MENU		0x06
+#define MODE_FUEL		0x07
+#define MODE_SPEED		0x08
+#define MODE_RPM		0x09
+#define MODE_DOORS_STATE	0x0A
 
-#define MODE_SENSORS_INFO	0xF0
+#define MODE_NONE		0xF0
+#define MODE_SENSORS_INFO	0xF1
 uint8_t mainmenu_pos=0, func_pos, subfunc_pos, MODE_MAIN=MODE_SPEED, doors_state=0;
 
 /*
@@ -311,7 +311,7 @@ void set_mode(uint8_t mode)
 		MODE_MAIN=mode;
 		draw_frame01();
 
-		twi_data_buf[0] = 0x14;
+		twi_data_buf[0] = DS1307_MEM_LASTMODE;
 		twi_data_buf[1] = mode;
 		twi_write_str(TWIADDR_DS1307,2,true);
 	}
@@ -382,7 +382,7 @@ void ac_send_cmd(uint8_t ac_cmd)
 
 void save_aflags(uint8_t send_to_ac)
 {
-	twi_data_buf[0] = 0x0D;
+	twi_data_buf[0] = DS1307_MEM_FLAGS;
 	twi_data_buf[1] = aflags;
 	twi_write_str(TWIADDR_DS1307, 2, true );
 
@@ -526,24 +526,10 @@ static void xarias_init(void)
 	 * Writing start address 08h - the beginning of data memory.
 	 * The check is simple: sum of two first bytes should give us third byte
 	 */
-	twi_data_buf[0] = 0x08;
+	twi_data_buf[0] = DS1307_MEM_CTRL;
 	twi_write_str(TWIADDR_DS1307,1,false); // sending start address to read from
 	twi_read_str(TWIADDR_DS1307,3,false);
-	/*
-	 * DS1307 memory map:
-	 * 	0x08-0x0A : control byte (sum of two previous bytes)
-	 *	0x0B      : contrast 
-	 *	0x0C      : brightness
-	 *	0x0D      : flag byte 
-	 *	0x0E-0x10 : currency
-	 *	0x11-0x12 : fuel cost
-	 *	0x13      : desired A/C temperature
-	 *	0x14      : last mode
-	 *	0x15-0x18 : passed_inj_ticks
-	 *	0x19-0x1C : passed_inj_ticks_overruns
-	 *	0x1D-0x20 : passed_speed_ticks
-	 *	0x21-0x24 : passed_seconds
-	 */
+	
 	if((uint8_t)(twi_data_buf[0]+twi_data_buf[1])!=twi_data_buf[2] || (!twi_data_buf[0] && !twi_data_buf[1]) )
 	{
 		_delay_us(5); // wait a little bit before next TWI operation
@@ -585,13 +571,13 @@ static void xarias_init(void)
 		twi_data_buf[4]  = (contrast);
 		twi_data_buf[5]  = (brightness);
 		twi_data_buf[6]  = aflags;
-		twi_data_buf[7]  = (currency[0]);
-		twi_data_buf[8]  = (currency[1]);
-		twi_data_buf[9]  = (currency[2]);
-		twi_data_buf[10]  = ((uint8_t)(fuel_cost>>8));
-		twi_data_buf[11] = ((uint8_t)(fuel_cost));
-		twi_data_buf[12] = (temp_ac);
-		twi_data_buf[13] = (modestate);
+		twi_data_buf[7] = (temp_ac);
+		twi_data_buf[8] = (modestate);
+		twi_data_buf[9]  = (currency[0]);
+		twi_data_buf[10]  = (currency[1]);
+		twi_data_buf[11]  = (currency[2]);
+		twi_data_buf[12]  = ((uint8_t)(fuel_cost>>8));
+		twi_data_buf[13] = ((uint8_t)(fuel_cost));
 
 		twi_write_str(TWIADDR_DS1307,14,true);
 
@@ -606,13 +592,13 @@ static void xarias_init(void)
 		contrast    	= twi_data_buf[0];
 		brightness  	= twi_data_buf[1];
 		aflags		= twi_data_buf[2] & ~FLAG_AC_ONOFF;
-		currency[0] 	= (char)twi_data_buf[3];
-		currency[1] 	= (char)twi_data_buf[4];
-		currency[2] 	= twi_data_buf[5];
-		fuel_cost 	= (uint16_t) (twi_data_buf[6]) << 8;
-		fuel_cost      += twi_data_buf[7];
-		temp_ac 	= twi_data_buf[8];
-		modestate	= twi_data_buf[9];
+		temp_ac 	= twi_data_buf[3];
+		modestate	= twi_data_buf[4];
+		currency[0] 	= (char)twi_data_buf[5];
+		currency[1] 	= (char)twi_data_buf[6];
+		currency[2] 	= twi_data_buf[7];
+		fuel_cost 	= (uint16_t) (twi_data_buf[8]) << 8;
+		fuel_cost      += twi_data_buf[9];
 
 		restore_passed_data();
 		_delay_us(5); // wait a little bit before next TWI operation
@@ -930,7 +916,7 @@ void draw_acinfo()
  */
 void draw_tempinfo()
 {
-	int8_t sign;
+	int8_t sign, mpart;
 	int32_t temp;
 	char str_temp='F';
 
@@ -942,14 +928,27 @@ void draw_tempinfo()
 	printf_P(PSTR("In"));
 	gLCD_locate(91,37);
 	temp  = ac_get_temp(AC_TEMP_IN_AVG, &sign);
-	printf_P(PSTR("%3d^%c"),sign*(int8_t)ROUND1(temp,4,4),str_temp);
+	mpart = ROUND1(temp,4,4);
+	printf_P(PSTR("%3d^%c"),sign*(mpart?mpart:1),str_temp);
+	if(!mpart)
+	{
+		gLCD_locate(91+2*6,37);
+		printf_P(PSTR("0"));
+	}
 
 	gLCD_line(89,45,127,45,true);
 	gLCD_locate(103,47);
 	printf_P(PSTR("Out"));
 	gLCD_locate(91,55);
 	temp = ac_get_temp(AC_TEMP_OUT_AVG, &sign);
-	printf_P(PSTR("%3d^%c"),sign*(int8_t)ROUND1(temp,4,4),str_temp);
+	mpart = ROUND1(temp,4,4);
+	printf_P(PSTR("%3d^%c"),sign*(mpart?mpart:1),str_temp);
+	if(!mpart)
+	{
+		gLCD_locate(91+2*6,55);
+		printf_P(PSTR("0"));
+	}
+
 }
 
 void draw_clock()
@@ -1168,7 +1167,7 @@ while(f==g)
 						temp_ac+=inc;
 						ac_send_cmd(AC_CMD_WRITE_TEMP);
 
-						twi_data_buf[0] = 0x13;
+						twi_data_buf[0] = DS1307_MEM_ACTEMP;
 						twi_data_buf[1] = temp_ac;
 						twi_write_str(TWIADDR_DS1307, 2, true);
 
@@ -1220,7 +1219,7 @@ while(f==g)
 					twi_stop();
 					*/
 						
-					twi_data_buf[0] = 0x0B;
+					twi_data_buf[0] = DS1307_MEM_CONTRAST;
 					twi_data_buf[1] = contrast;
 					twi_data_buf[2] = brightness;
 					twi_write_str(TWIADDR_DS1307, 3, true);
@@ -1282,6 +1281,14 @@ while(f==g)
 							if(KB_DOWN==1 || KB_DOWN==REPEAT_STROKES)
 							{
 								fuel_cost--;
+							}
+							if(KB_RIGHT==1 || KB_RIGHT==REPEAT_STROKES)
+							{
+								fuel_cost+=100;
+							}
+							if(KB_LEFT==1 || KB_LEFT==REPEAT_STROKES)
+							{
+								fuel_cost-=100;
 							}
 							gLCD_locate(68,13);
 							printf_P(PSTR("%4u.%02u"),ROUND1(fuel_cost,2,2),ROUND2(fuel_cost,2,2));
@@ -1356,7 +1363,7 @@ while(f==g)
 						
 						/*twi_start();
 						twi_write_addr(TWIADDR_DS1307);
-						twi_write_byte(0x0D);
+						twi_write_byte(DS1307_MEM_FLAGS);
 						twi_write_byte(((uint8_t)is_km)|((uint8_t)is_litres<<1)|(AFLAGS_ISSET(FLAG_AC_MODE)?_BV(2):0));
 						twi_write_byte(currency[0]);
 						twi_write_byte(currency[1]);
@@ -1367,14 +1374,13 @@ while(f==g)
 						*/
 
 
-	                                        twi_data_buf[0] = 0x0D;
-	                                        twi_data_buf[1] = aflags;
-	                                        twi_data_buf[2] = currency[0];
-	                                        twi_data_buf[3] = currency[1];
-	                                        twi_data_buf[4] = currency[2];
-	                                        twi_data_buf[5] = (uint8_t)(fuel_cost>>8);
-	                                        twi_data_buf[6] = (uint8_t)(fuel_cost);
-	                                        twi_write_str(TWIADDR_DS1307, 7, true);
+	                                        twi_data_buf[0] = DS1307_MEM_CURRENCY;
+	                                        twi_data_buf[1] = currency[0];
+	                                        twi_data_buf[2] = currency[1];
+	                                        twi_data_buf[3] = currency[2];
+	                                        twi_data_buf[4] = (uint8_t)(fuel_cost>>8);
+	                                        twi_data_buf[5] = (uint8_t)(fuel_cost);
+	                                        twi_write_str(TWIADDR_DS1307, 6, true);
 
 					}
 					
@@ -1631,7 +1637,11 @@ while(f==g)
 				}
 			} break;
 
-			default: error(ERROR_UNKNOWN_MODE);
+			default: 
+			{
+				error(ERROR_UNKNOWN_MODE);
+				set_mode(MODE_MAIN);
+			};
 		}
 		/*
 		 **************************************************
@@ -1747,6 +1757,7 @@ while(f==g)
 
 					draw_clock();
 					draw_acinfo();
+					draw_tempinfo();
 
 				} break;
 
@@ -1965,7 +1976,7 @@ while(f==g)
 				{
 					uint8_t dev_num;
 					uint32_t temp;
-					int8_t sign;
+					int8_t mpart, sign;
 					gLCD_frame(0,0,127,63,1,true);
 					gLCD_locate(23,2);
 					printf_P(PSTR("AIRCON SETTINGS"));
@@ -1975,13 +1986,20 @@ while(f==g)
 
 					twi_data_buf[0]=AC_CMD_GET_1W_DEVS_CNT;
 					twi_write_str(TWIADDR_AC,1,false);
+					twi_read_str(TWIADDR_AC,1,false);
 					dev_num=twi_data_buf[0];
 					
 					for(i=0;i<dev_num;i++)
 					{
 						temp=ac_get_temp(i, &sign);
+						mpart=(int16_t)ROUND1(temp,4,1);
 						gLCD_locate(2,10*i+23);
-						printf_P(PSTR("Sensor %d :%4d.%d^%c"),i,sign*ROUND1(temp,4,1),ROUND2(temp,4,1),str_temp);
+						printf_P(PSTR("Sensor %d :%4d.%d^%c"),i,sign*(mpart?mpart:1),ROUND2(temp,4,1),str_temp);
+						if(!mpart)
+						{
+							gLCD_locate(13*6+2,10*i+23);
+							printf_P(PSTR("0"));
+						}
 					}
 	
 					
@@ -2005,7 +2023,7 @@ while(f==g)
 				{
 					int32_t temp;
 					uint8_t dev_num;
-					int8_t sign;
+					int8_t sign, mpart;
 
 					gLCD_frame(0,0,127,63,1,true);
 					gLCD_locate(2,2);
@@ -2023,6 +2041,7 @@ while(f==g)
 					j=((dev_num+1)/2);
 					func_pos %= j;
 					
+					sign=1;
 					for(i=func_pos*2;i<func_pos*2+2 && i<dev_num;i++)
 					{
 						twi_data_buf[0]=AC_CMD_GET_1W_DEVS_ADDR;
@@ -2043,8 +2062,14 @@ while(f==g)
 							twi_data_buf[0]);
 
 						temp=ac_get_temp(i,&sign);
+						mpart=ROUND1(temp,4,4);
 						gLCD_locate(2,16*(i%2)+31);
-						printf_P(PSTR("t: %4d.%04d^%c"),sign*ROUND1(temp,4,4), ROUND2(temp,4,4),str_temp);
+						printf_P(PSTR("t: %4d.%04d^%c"),sign*(mpart?mpart:1), ROUND2(temp,4,4),str_temp);
+						if(!mpart)
+						{
+							gLCD_locate(6*6+2,16*(i%2)+31);
+							printf_P(PSTR("0"));
+						}
 					}
 
  				} break;
@@ -2353,7 +2378,7 @@ SIGNAL(SIG_INTERRUPT0)
 
 		// checking for lights state
 		// Inform if engeen speed is greater than 600 RPM and car speed is greater then 3km/h
-		if(rpm_ticks > 600 / RPM_MULTIPLIER && calc_speed_m()*36/10 > 3000 && !pin_lights_state)
+		if(rpm_ticks > 600 / RPM_MULTIPLIER && calc_speed_m() > 0 && !pin_lights_state)
 		{
 			twi_data_buf[0]=AC_CMD_MAKE_BEEPS;
 			twi_data_buf[1]=2;

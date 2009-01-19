@@ -55,6 +55,21 @@
 #define TWIADDR_MAINBOARD	0xBA
 #define TWIADDR_AC		0xAA
 
+/*
+ * DS1307 memory map:
+ */
+#define DS1307_MEM_CTRL 	0x08 // 0x08-0x0A control bytes 
+#define DS1307_MEM_CONTRAST	0x0B // contrast 
+#define DS1307_MEM_BRIGHTNESS	0x0C // brightness
+#define DS1307_MEM_FLAGS	0x0D // flag byte 
+#define DS1307_MEM_ACTEMP	0x0E // desired A/C temperature 		old 0x13
+#define DS1307_MEM_LASTMODE	0x0F // last mode				old 0x14
+#define DS1307_MEM_CURRENCY	0x10 // 0x10-0x12 currency			old 0x0E-0x10
+#define DS1307_MEM_FUELCOST	0x13 // 0x13-0x14 fuel cost			old 0x11-0x12
+#define DS1307_MEM_INJTICKS	0x15 //	0x15-0x18 passed_inj_ticks
+#define DS1307_MEM_INJOVERS	0x19 // 0x19-0x1C passed_inj_ticks_overruns
+#define DS1307_MEM_SPEEDTICKS	0x1D // 0x1D-0x20 passed_speed_ticks
+#define DS1307_MEM_SECONDS	0x21 // 0x21-0x24 passed_seconds
 
 
 #define AC_TEMP_OUT_SENSOR	0
