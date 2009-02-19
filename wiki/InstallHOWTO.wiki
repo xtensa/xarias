@@ -30,7 +30,7 @@ future release.
 
 XARIAS was originally developped under Linux. 
 It should be possible to compile XARIAS  firmware in Windows environment 
-using WinAVR and installing with AvrDude but it was never tested. 
+using WinAVR and installing with !AvrDude but it was never tested. 
 Any windows-user's feedback are welcome.
 
 == Prerequisists ==
