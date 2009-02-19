@@ -1,6 +1,6 @@
-#summary General description of the XARIAS project
+﻿#summary General description of the XARIAS project
 
-*Other pages:* [AboutXARIAS], [Functionality], [Hardware], [SourceCode], [Author]
+*Other pages:* [AboutXARIAS], [Functionality], [Hardware], [SourceCode], [InstallHOWTO], [Author]
 
 = Introduction =
 

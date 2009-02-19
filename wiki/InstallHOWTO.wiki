@@ -1,5 +1,7 @@
 ﻿#summary Detailed HOWTO if you want to intstall XARIAS in your car.
 
+*Other pages:* [AboutXARIAS], [Functionality], [Hardware], [SourceCode], [InstallHOWTO], [Author]
+
 = Assembling XARIAS board =
 
 Making and assembling PCB is not concern of this Wiki. Use pcb tool 

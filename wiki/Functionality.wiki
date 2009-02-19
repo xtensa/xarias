@@ -1,6 +1,6 @@
-#summary Functionality description of XARIAS embeded computer.
+﻿#summary Functionality description of XARIAS embeded computer.
 
-*Other pages:* [AboutXARIAS], [Functionality], [Hardware], [SourceCode], [Author]
+*Other pages:* [AboutXARIAS], [Functionality], [Hardware], [SourceCode], [InstallHOWTO], [Author]
 
 = XARIAS functionality =
 
