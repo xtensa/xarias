@@ -17,12 +17,12 @@ manual above.
 
 == Important notes ==
 
-Please keep in mind that !I2C bus is very sensitive to distorsions. Make sure that 
+Please keep in mind that I2C bus is very sensitive to distorsions. Make sure that 
 the capacitance of the wires connecting two boards is as small as possible. I
 suggest to use wires not longer than 15cm and also they should be shielded.
 
-Another important thing is that !DS1803 should be 10kOhm. It mean you need 
-!DS1803-010 (other options are !DS1803-050 and !DS1803-100 which are wrong).
+Another important thing is that DS1803 should be 10kOhm. It mean you need 
+DS1803-010 (other options are DS1803-050 and DS1803-100 which are wrong).
 It was not mentioned in schematics by mistake, but it will be corrected in the 
 future release.
 
@@ -39,8 +39,8 @@ Before you will start compiling the firmware please make sure
 that you have all prerequsits installed. You will need the 
 following programs and libraries:
  * *avr-libc* - AVR C runtime library, a Free Software project whose goal is to provide a high quality C library for use with GCC on Atmel AVR microcontrollers.
- * *avr-binutils* - a collection of binary tools for AVR !MCUs.
- * *avr-gcc* - C compilier for AVR !MCUs.
+ * *avr-binutils* - a collection of binary tools for AVR MCUs.
+ * *avr-gcc* - C compilier for AVR MCUs.
  * *make* - a tool which controls the generation of executables and other non-source files of a program from the program's source files. 
  * *avrdude* - a software for programming Atmel AVR Microcontrollers.
 
@@ -63,4 +63,3 @@ I receive a lot of emails with problems. Most of them was resolved by correctly 
 To install XARIAS in your car you need to find the following signals:
 
 to be written...
-
