@@ -29,6 +29,16 @@
 #define s6b0108_indata()  s6b0108_inbyte(1)
 
 
+/*
+ * Normally different display segments are activated by low line level 
+ * on CS1, CS2 or CS3. But there are some manufacturers whos products
+ * are not compliant with this standart. If you can't see anything on 
+ * the display you probably need to set 1 here.
+ */
+#ifndef CS_LINES_INVERTED
+	#define CS_LINES_INVERTED 0
+#endif
+
 void    s6b0108_outbyte(uint8_t n, uint8_t rs);
 uint8_t s6b0108_inbyte(uint8_t rs);
 
