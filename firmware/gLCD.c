@@ -55,9 +55,13 @@ void gLCD_switchon()
 	B02_PORT_SET(LCD_POWER);
 
 	DDR(S6B0108_PCMD)  |=  ( _BV(CS1) | _BV(CS2) | _BV(RST) | _BV(E) | _BV(RW) | _BV(RS));
-
+#if CS_LINES_INVERTED==1
 	PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) | _BV(RW) | _BV(RS) | _BV(RST) | _BV(E));
-	
+#else
+	PORT(S6B0108_PCMD) &= ~( _BV(RW) | _BV(RS) | _BV(RST) | _BV(E));
+	PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) );
+#endif
+
 	// swithing display power back after delay
 	_delay_us(5);
 	B02_PORT_UNSET(LCD_POWER);
@@ -79,7 +83,12 @@ void gLCD_switchon()
 void gLCD_switchoff()
 {
 	if (!is_lcd_on) return;
-        PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) |_BV(RW) | _BV(RS) | _BV(RST) | _BV(E));
+#if CS_LINES_INVERTED==1
+	PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) | _BV(RW) | _BV(RS) | _BV(RST) | _BV(E));
+#else
+	PORT(S6B0108_PCMD) &= ~( _BV(RW) | _BV(RS) | _BV(RST) | _BV(E));
+	PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) );
+#endif
 	PORT(S6B0108_PDATA)=0x00;
 	B02_PORT_SET(LCD_POWER); 
 	is_lcd_on=false;
@@ -91,14 +100,28 @@ void gLCD_cls()
 	uint8_t i,j;
 
 	if (!is_lcd_on) return;
-#if GLCD_RES_X/64==1
-	PORT(S6B0108_PCMD) |= _BV(CS1);
-#endif
-#if GLCD_RES_X/64==2
-	PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) );
-#endif
-#if GLCD_RES_X/64==3
-	PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) | _BV(CS3) );
+
+
+#if CS_LINES_INVERTED==1
+	#if GLCD_RES_X/64==1
+		PORT(S6B0108_PCMD) |= _BV(CS1);
+	#endif
+	#if GLCD_RES_X/64==2
+		PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) );
+	#endif
+	#if GLCD_RES_X/64==3
+		PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) | _BV(CS3) );
+	#endif
+#else
+	#if GLCD_RES_X/64==1
+		PORT(S6B0108_PCMD) &= ~_BV(CS1);
+	#endif
+	#if GLCD_RES_X/64==2
+		PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) );
+	#endif
+	#if GLCD_RES_X/64==3
+		PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) | _BV(CS3) );
+	#endif
 #endif
 	s6b0108_outcmd(S6B0108_DISPLAY_OFF);
 	s6b0108_outcmd(S6B0108_START_MASK);
@@ -110,14 +133,26 @@ void gLCD_cls()
 			s6b0108_outdata(0x00);
 	}
 	s6b0108_outcmd(S6B0108_DISPLAY_ON);
-#if GLCD_RES_X/64==1
-	PORT(S6B0108_PCMD) &= ~_BV(CS1);
-#endif
-#if GLCD_RES_X/64==2
-	PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) );
-#endif
-#if GLCD_RES_X/64==3
-	PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) | _BV(CS3) );
+#if CS_LINES_INVERTED==1
+	#if GLCD_RES_X/64==1
+		PORT(S6B0108_PCMD) &= ~_BV(CS1);
+	#endif
+	#if GLCD_RES_X/64==2
+		PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) );
+	#endif
+	#if GLCD_RES_X/64==3
+		PORT(S6B0108_PCMD) &= ~( _BV(CS1) | _BV(CS2) | _BV(CS3) );
+	#endif
+#else
+	#if GLCD_RES_X/64==1
+		PORT(S6B0108_PCMD) |= _BV(CS1);
+	#endif
+	#if GLCD_RES_X/64==2
+		PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) );
+	#endif
+	#if GLCD_RES_X/64==3
+		PORT(S6B0108_PCMD) |= ( _BV(CS1) | _BV(CS2) | _BV(CS3) );
+	#endif
 #endif
 }
 
@@ -161,12 +196,22 @@ void gLCD_draw_rect(uint16_t x1, uint8_t y1, uint16_t x2, uint8_t y2, uint8_t pt
 			if(!(x%64) || x==x1) 
 			{
 				cs=x/64;
+#if CS_LINES_INVERTED==1
 				if(cs==0) PORT(S6B0108_PCMD) |= _BV(CS1); else PORT(S6B0108_PCMD) &= ~_BV(CS1); 
-#if GLCD_RES_X/64>1
+	#if GLCD_RES_X/64>1
 				if(cs==1) PORT(S6B0108_PCMD) |= _BV(CS2); else PORT(S6B0108_PCMD) &= ~_BV(CS2); 
-#endif
-#if GLCD_RES_X/64>2
+	#endif
+	#if GLCD_RES_X/64>2
 				if(cs==2) PORT(S6B0108_PCMD) |= _BV(CS3); else PORT(S6B0108_PCMD) &= ~_BV(CS3); 
+	#endif
+#else
+				if(cs==0) PORT(S6B0108_PCMD) &= ~_BV(CS1); else PORT(S6B0108_PCMD) |= _BV(CS1); 
+	#if GLCD_RES_X/64>1
+				if(cs==1) PORT(S6B0108_PCMD) &= ~_BV(CS2); else PORT(S6B0108_PCMD) |= _BV(CS2); 
+	#endif
+	#if GLCD_RES_X/64>2
+				if(cs==2) PORT(S6B0108_PCMD) &= ~_BV(CS3); else PORT(S6B0108_PCMD) |= _BV(CS3); 
+	#endif
 #endif
 				s6b0108_outcmd(S6B0108_SETX_MASK|y);
 				/*
@@ -235,12 +280,22 @@ void gLCD_pixel(uint16_t x, uint8_t y, bool onoff)
 	uint8_t tmp;
 	if (!is_lcd_on) return;
 	if(x>=GLCD_RES_X || y>=GLCD_RES_Y) return;
+#if CS_LINES_INVERTED==1
 	if(x/64==0) PORT(S6B0108_PCMD) |= _BV(CS1); else PORT(S6B0108_PCMD) &= ~_BV(CS1); 
-#if GLCD_RES_X/64>1
-	if(x/64==1) PORT(S6B0108_PCMD) |= _BV(CS2); else PORT(S6B0108_PCMD) &= ~_BV(CS2); 
-#endif
-#if GLCD_RES_X/64>2
-	if(x/64==2) PORT(S6B0108_PCMD) |= _BV(CS3); else PORT(S6B0108_PCMD) &= ~_BV(CS3); 
+	#if GLCD_RES_X/64>1
+		if(x/64==1) PORT(S6B0108_PCMD) |= _BV(CS2); else PORT(S6B0108_PCMD) &= ~_BV(CS2); 
+	#endif
+	#if GLCD_RES_X/64>2
+		if(x/64==2) PORT(S6B0108_PCMD) |= _BV(CS3); else PORT(S6B0108_PCMD) &= ~_BV(CS3); 
+	#endif
+#else
+	if(x/64==0) PORT(S6B0108_PCMD) &= ~_BV(CS1); else PORT(S6B0108_PCMD) |= _BV(CS1); 
+	#if GLCD_RES_X/64>1
+		if(x/64==1) PORT(S6B0108_PCMD) &= ~_BV(CS2); else PORT(S6B0108_PCMD) |= _BV(CS2); 
+	#endif
+	#if GLCD_RES_X/64>2
+		if(x/64==2) PORT(S6B0108_PCMD) &= ~_BV(CS3); else PORT(S6B0108_PCMD) |= _BV(CS3); 
+	#endif
 #endif
 
 	s6b0108_outcmd(S6B0108_SETX_MASK|(y/8));
