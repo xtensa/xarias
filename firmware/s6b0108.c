@@ -94,9 +94,9 @@ uint8_t s6b0108_inbyte(uint8_t rs)
 		_delay_us(0.2);
 		//first access is to copy display data to display output register
 		PORT(S6B0108_PCMD) |= _BV(E);
-		_delay_us(0.5);
+		_delay_us(2.0); 
 		PORT(S6B0108_PCMD) &= ~_BV(E);
-		_delay_us(2.5); // 0.5 should be enough but doesn't work
+		_delay_us(3.0); // 0.5 should be enough but doesn't work
 	}
 	else
 	{	// reading status
@@ -105,7 +105,7 @@ uint8_t s6b0108_inbyte(uint8_t rs)
 		_delay_us(0.2);
 	}
 	PORT(S6B0108_PCMD) |= _BV(E);
-	_delay_us(1.2); // 0.32 should be enough but doesn't work
+	_delay_us(2.0); // 0.32 should be enough but doesn't work
  	x = PIN(S6B0108_PDATA);
 	_delay_us(0.2);
 	PORT(S6B0108_PCMD) &= ~_BV(E);
