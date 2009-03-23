@@ -1,0 +1,3 @@
+schematics ac_board.sch
+output-name ac_board_v0.1
+elements-dir ../footprints/

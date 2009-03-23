@@ -1,0 +1,3 @@
+schematics main_board.sch
+output-name xarias_b0.2
+elements-dir ../footprints/
