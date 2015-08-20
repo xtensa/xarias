@@ -1,3 +1,5 @@
+**Other pages:** [AboutXARIAS](AboutXARIAS.md), [Functionality](Functionality.md), [Hardware](Hardware.md), [SourceCode](SourceCode.md), [InstallHOWTO](InstallHOWTO.md), [Author](Author.md)
+
 XARIAS is embedded car computer system, based on ATMega32 MCU and programmed using C language and compiled with gcc compiler. Total binary code size is only 22Kb including all fonts definition!!!
 
 Xarias is not utilizing OBD-II interface. All data is read directly from the sensors (speed, rpm, fuel injectors, etc).
