@@ -1,0 +1,24 @@
+﻿#summary General description of the XARIAS project
+
+**Other pages:** [AboutXARIAS](AboutXARIAS.md), [Functionality](Functionality.md), [Hardware](Hardware.md), [SourceCode](SourceCode.md), [InstallHOWTO](InstallHOWTO.md), [Author](Author.md)
+
+# Introduction #
+
+XARIAS is embeded system that runs under Atmel's ATmega32 MCU control. It is designed to gain different information from your car and display it in human-readable form. You can install Xarias in any gasoline powered car (except old carburettor cars). Xarias should work properly with LPG engines but this was not tested yet. All test was made on Toyota Corolla E10 '97.
+
+Please take a note, that Xarias is not using OBD-II interface. Xarias is connected directly to speed sensor, engine rpm sensor and to fuel injectors.
+
+http://lh6.ggpht.com/xtensa/SGq1u_mMI2I/AAAAAAAABlc/kVrQHKuW6UE/P1160466.jpg?imgmax=720
+
+In the feature it will also be capable of controlling different car subsystems (like power window). At the moment XARIAS v02 is capable of doing the following:
+  * calculate momentary and avarage speed
+  * calculate momentary and avarage fuel consumption
+  * show engine RPM
+  * calculate journey time and distance
+  * calculate total fuel consumed and it's cost
+  * show temepratures (inside/outside)
+  * air conditioner automatic control and programming
+
+For more information about hardware visit [Hardware](Hardware.md) page.
+
+For more information about functionality visit [Functionality](Functionality.md) page.

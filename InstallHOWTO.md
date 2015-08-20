@@ -1,0 +1,67 @@
+﻿#summary Detailed HOWTO if you want to intstall XARIAS in your car.
+
+**Other pages:** [AboutXARIAS](AboutXARIAS.md), [Functionality](Functionality.md), [Hardware](Hardware.md), [SourceCode](SourceCode.md), [InstallHOWTO](InstallHOWTO.md), [Author](Author.md)
+
+# Assembling XARIAS board #
+
+Making and assembling PCB is not concern of this Wiki. Use pcb tool
+of gEDA suite to print PCB layout. Then go ahead with the steps
+described in this nice manual: http://robotics.ee.calpoly.edu/dokuwiki/doku.php?id=articles:homemade_pcbs.
+The only difference is that XARIAS uses two-sided PCB. To syncronise
+left and right side of the PCB you can do the following: before
+ironing the design to the copper, make 4 holes in different corners
+of the pcb. Holes should be "real" used for fitting the details
+during assembling. Then cut off printed designs to be the same size as the
+board is. Make holes in the same places in the paper and sew all three layers
+alltogether (printed side to copper of course). Then proceed as said in
+manual above.
+
+
+## Important notes ##
+
+Please keep in mind that I2C bus is very sensitive to distorsions. Make sure that
+the capacitance of the wires connecting two boards is as small as possible. I
+suggest to use wires not longer than 15cm and also they should be shielded.
+
+Another important thing is that DS1803 should be 10kOhm. It mean you need
+DS1803-010 (other options are DS1803-050 and DS1803-100 which are wrong).
+It was not mentioned in schematics by mistake, but it will be corrected in the
+future release.
+
+# Compilling and installing firmware #
+
+XARIAS was originally developped under Linux.
+It should be possible to compile XARIAS  firmware in Windows environment
+using WinAVR and installing with AvrDude but it was never tested.
+Any windows-user's feedback are welcome.
+
+## Prerequisists ##
+
+Before you will start compiling the firmware please make sure
+that you have all prerequsits installed. You will need the
+following programs and libraries:
+  * **avr-libc** - AVR C runtime library, a Free Software project whose goal is to provide a high quality C library for use with GCC on Atmel AVR microcontrollers.
+  * **avr-binutils** - a collection of binary tools for AVR MCUs.
+  * **avr-gcc** - C compilier for AVR MCUs.
+  * **make** - a tool which controls the generation of executables and other non-source files of a program from the program's source files.
+  * **avrdude** - a software for programming Atmel AVR Microcontrollers.
+
+## Compiling and programming ##
+
+Use 'make' command to compile firmware. If typed without input parameters
+it will display possible targets.
+  * make X        - build firmware for X xarias board
+  * make inst\_X   - build and install firmware for X board
+  * make fuses\_X  - write fuse bits
+
+Possible boards are b01 for v0.1 version of XARIAS, and  b02 and ac
+for v0.2 version of project.
+
+Please take into account that if you do not program the fuses correctly the system will not work.
+I receive a lot of emails with problems. Most of them was resolved by correctly programed fusebits.
+
+# Installing XARIAS in the Car #
+
+To install XARIAS in your car you need to find the following signals:
+
+to be written...
