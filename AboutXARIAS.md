@@ -1,4 +1,4 @@
-﻿#summary General description of the XARIAS project
+﻿#General description of the XARIAS project
 
 **Other pages:** [AboutXARIAS](AboutXARIAS.md), [Functionality](Functionality.md), [Hardware](Hardware.md), [SourceCode](SourceCode.md), [InstallHOWTO](InstallHOWTO.md), [Author](Author.md)
 
