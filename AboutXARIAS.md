@@ -8,7 +8,7 @@ XARIAS is embeded system that runs under Atmel's ATmega32 MCU control. It is des
 
 Please take a note, that Xarias is not using OBD-II interface. Xarias is connected directly to speed sensor, engine rpm sensor and to fuel injectors.
 
-http://lh6.ggpht.com/xtensa/SGq1u_mMI2I/AAAAAAAABlc/kVrQHKuW6UE/P1160466.jpg?imgmax=720
+![xarias](http://lh6.ggpht.com/xtensa/SGq1u_mMI2I/AAAAAAAABlc/kVrQHKuW6UE/P1160466.jpg?imgmax=720)
 
 In the feature it will also be capable of controlling different car subsystems (like power window). At the moment XARIAS v02 is capable of doing the following:
   * calculate momentary and avarage speed
