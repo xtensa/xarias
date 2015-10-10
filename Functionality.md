@@ -1,4 +1,4 @@
-﻿#summary Functionality description of XARIAS embeded computer.
+#Functionality description of XARIAS embeded computer.
 
 **Other pages:** [AboutXARIAS](AboutXARIAS.md), [Functionality](Functionality.md), [Hardware](Hardware.md), [SourceCode](SourceCode.md), [InstallHOWTO](InstallHOWTO.md), [Author](Author.md)
 
@@ -8,7 +8,7 @@ XARIAS has wide range of functional capabilities.
 
 ## Buttons description ##
 
-http://lh6.ggpht.com/xtensa/SGq1clxZA9I/AAAAAAAABkY/0ff83ERZTSw/p1150486.jpg?imgmax=400
+![xarias](http://lh6.ggpht.com/xtensa/SGq1clxZA9I/AAAAAAAABkY/0ff83ERZTSw/p1150486.jpg?imgmax=400)
 
 | **Button** | **Name** | **Description** |
 |:-----------|:---------|:----------------|
@@ -29,25 +29,25 @@ http://lh6.ggpht.com/xtensa/SGq1clxZA9I/AAAAAAAABkY/0ff83ERZTSw/p1150486.jpg?img
 
 ## SPEED mode ##
 
-http://lh4.ggpht.com/xtensa/SGq1A6jKZiI/AAAAAAAABiw/nMKr4-hFRd8/p1150585.jpg?imgmax=400
+![speed mode](http://lh4.ggpht.com/xtensa/SGq1A6jKZiI/AAAAAAAABiw/nMKr4-hFRd8/p1150585.jpg?imgmax=400)
 
 In speed mode the main information is momentary speed which is displayed with the greatest font. You can see also speed in meters per second above. Passed distance is displayed below. Average speed is displayed in bottom-left corner. All values (except speed in meters per second) are displayed in units selected in "Trip Settings" menu.
 
 ## FUEL mode ##
 
-http://lh6.ggpht.com/xtensa/SGq0_LU7qjI/AAAAAAAABio/jFEKWEAuWvc/p1150583.jpg?imgmax=400
+![fuel mode](http://lh6.ggpht.com/xtensa/SGq0_LU7qjI/AAAAAAAABio/jFEKWEAuWvc/p1150583.jpg?imgmax=400)
 
 In fuel mode the main information, which is momentary fuel consumption per 100 units (km or mi), is displayed with the greatest font. You can find fuel consumption per one hour above. Average fuel consumption is displayed in bottom-left corner.
 
 ## TRIP mode ##
 
-http://lh5.ggpht.com/xtensa/SGq1S1izk7I/AAAAAAAABj4/ee2xy_SS1Sk/p1150606.jpg?imgmax=400
+![trip mode](http://lh5.ggpht.com/xtensa/SGq1S1izk7I/AAAAAAAABj4/ee2xy_SS1Sk/p1150606.jpg?imgmax=400)
 
 In trip mode you can find all totals for your trip. Here is total passed distance, total trip time (all stops with engine running are also included), total fuel consumed and total fuel cost. All units can be changed in "Trip settings" menu.
 
 ## RPM mode ##
 
-http://lh4.ggpht.com/xtensa/SGq1EcgY68I/AAAAAAAABjA/zfmAqpIuo_M/p1150590.jpg?imgmax=400
+![RPM mode](http://lh4.ggpht.com/xtensa/SGq1EcgY68I/AAAAAAAABjA/zfmAqpIuo_M/p1150590.jpg?imgmax=400)
 
 In RPM mode you can see current engine RPM, passed distance and average speed.
 
@@ -57,7 +57,7 @@ On all images above you can see that right side of the display is reserved for A
 
 ## Main menu ##
 
-http://lh3.ggpht.com/xtensa/SGq0nTOrPNI/AAAAAAAABhc/jPjmJzoBrvo/p1150548.jpg?imgmax=400
+![main menu](http://lh3.ggpht.com/xtensa/SGq0nTOrPNI/AAAAAAAABhc/jPjmJzoBrvo/p1150548.jpg?imgmax=400)
 
 | **Menu position** | **Description** |
 |:------------------|:----------------|
@@ -69,7 +69,7 @@ http://lh3.ggpht.com/xtensa/SGq0nTOrPNI/AAAAAAAABhc/jPjmJzoBrvo/p1150548.jpg?img
 
 ## Trip settings ##
 
-http://lh6.ggpht.com/xtensa/SGq1GRy-U1I/AAAAAAAABjI/cdrXoqUXIJs/p1150592.jpg?imgmax=400
+![trip settings](http://lh6.ggpht.com/xtensa/SGq1GRy-U1I/AAAAAAAABjI/cdrXoqUXIJs/p1150592.jpg?imgmax=400)
 
 Adjust fuel cost here, set currency, or change distance and fuel units.
 
@@ -83,25 +83,25 @@ You can also reset trip data from here. If you do so, trip time, total fuel and 
 
 ## Date & Time settings ##
 
-http://lh5.ggpht.com/xtensa/SGq1K6Gr6NI/AAAAAAAABjY/iXL9surcg9E/p1150595.jpg?imgmax=400
+![dat&time settings](http://lh5.ggpht.com/xtensa/SGq1K6Gr6NI/AAAAAAAABjY/iXL9surcg9E/p1150595.jpg?imgmax=400)
 
 Set time here.
 
 ## Screen adjustment ##
 
-http://lh3.ggpht.com/xtensa/SGq1My7JQmI/AAAAAAAABjg/wpMOXoLon-s/p1150599.jpg?imgmax=400
+![screen adjustment](http://lh3.ggpht.com/xtensa/SGq1My7JQmI/AAAAAAAABjg/wpMOXoLon-s/p1150599.jpg?imgmax=400)
 
 Smoothly adjust screen settings here.
 
 ## AirCon settings ##
 
-http://lh6.ggpht.com/xtensa/SGq1OpZ1xFI/AAAAAAAABjo/90R9dGWpHIk/p1150600.jpg?imgmax=400
+![AirCon settings](http://lh6.ggpht.com/xtensa/SGq1OpZ1xFI/AAAAAAAABjo/90R9dGWpHIk/p1150600.jpg?imgmax=400)
 
 Choose between Celsius and Fahrenheit scale here. You can also see current temperature on each sensor here.
 
-## Openned dorrs mode ##
+## Openned doors mode ##
 
-http://lh6.ggpht.com/xtensa/SHE8oHQcawI/AAAAAAAABsM/Jz4lC2YZ0Qg/p1160495.jpg?imgmax=400
+![doors](http://lh6.ggpht.com/xtensa/SHE8oHQcawI/AAAAAAAABsM/Jz4lC2YZ0Qg/p1160495.jpg?imgmax=400)
 
 If the system is in one of the main modes and th door is openned, xarias will automatically notify us which one is openned. You can exit this mode by closing all doors or manually by pressing OK or ESC button. To eneter this mode manuall just press FN button (maybe changed in the feature).
 
