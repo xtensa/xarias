@@ -1,4 +1,4 @@
-﻿#summary Hardware description of the XARIAS project
+# Hardware description of the XARIAS project
 
 **Other pages:** [AboutXARIAS](AboutXARIAS.md), [Functionality](Functionality.md), [Hardware](Hardware.md), [SourceCode](SourceCode.md), [InstallHOWTO](InstallHOWTO.md), [Author](Author.md)
 
@@ -8,7 +8,7 @@
 ## XARIAS board b02 ##
 XARIAS board b02 is the first board of XARIAS on PCB. The previous (b01) was very experimental and was developed on cardboard.
 
-http://lh6.ggpht.com/xtensa/SGq03BBXCKI/AAAAAAAABiI/07IVXxMHRd0/p1150567.jpg?imgmax=720
+![xarias board](http://lh6.ggpht.com/xtensa/SGq03BBXCKI/AAAAAAAABiI/07IVXxMHRd0/p1150567.jpg?imgmax=720)
 
 ### MCU ###
 The heart of the system is ATMega32 MCU.
@@ -28,7 +28,7 @@ Double digital potentiometer (10k) is used to control brightnes and contrast of 
 ## AC board ##
 AC board is a separate board that is designed to be autonomous system that controlles air conditioner. This board controls two main devices - native AC board that originally was turned on or off manually and blower motor. Blower motor speed is controlled using PWM, so smooth regulation is available. AC board is equipped with 1-wire bus. Several DS18B20 temperature sensors are attached to this bus. AC board communicate with main XARIAS board through I2C bus.
 
-http://lh5.ggpht.com/xtensa/SGq07beRxnI/AAAAAAAABiY/NuoTS1YCT3Y/p1150575.jpg?imgmax=720
+![xarias AC board](http://lh5.ggpht.com/xtensa/SGq07beRxnI/AAAAAAAABiY/NuoTS1YCT3Y/p1150575.jpg?imgmax=720)
 
 ### MCU ###
 The heart of the AC board is ATMega8 MCU. It is more than enough for this job.
