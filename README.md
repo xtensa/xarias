@@ -4,7 +4,7 @@ XARIAS is embedded car computer system, based on ATMega32 MCU and programmed usi
 
 Xarias is not utilizing OBD-II interface. All data is read directly from the sensors (speed, rpm, fuel injectors, etc).
 
-http://lh4.ggpht.com/xtensa/SGq1yUVEsbI/AAAAAAAABls/jbzNeQDPBTg/P1160479.jpg?imgmax=512
+![xarias](http://lh4.ggpht.com/xtensa/SGq1yUVEsbI/AAAAAAAABls/jbzNeQDPBTg/P1160479.jpg?imgmax=512)
 
 The following features are available:
   * speed, fuel consumption, engine RPM calculating
@@ -23,7 +23,7 @@ The newest version is v0.2 release candidate 2. The most important issue that rc
 The most recent version (but not always stable) is available from SVN.
 
 In the meantime I am glad to let you know that new XARIAS implementations appears in the world. Here is one of them:
-http://lh3.ggpht.com/_7TzSR0Twwws/Scfq_4gsgaI/AAAAAAAADUk/cY4aPgq5mHY/s800/P3160298.JPG?imgmax=512
+![xarias2](http://lh3.ggpht.com/_7TzSR0Twwws/Scfq_4gsgaI/AAAAAAAADUk/cY4aPgq5mHY/s800/P3160298.JPG?imgmax=512)
 
 For more deatiled information please visit XARIAS wiki: http://code.google.com/p/xarias/w/list.
 
