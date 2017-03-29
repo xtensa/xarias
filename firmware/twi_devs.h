@@ -31,7 +31,7 @@ uint8_t twi_data_buf[17];
 /*
  * This function sets up TWI bus
  */
-void inline twi_init();
+void twi_init();
 
 //uint8_t inline twi_write_addr(uint8_t addr);
 //uint8_t inline twi_write_byte(uint8_t data);
@@ -43,7 +43,7 @@ void twi_write_str (uint8_t dev_addr, uint8_t count, bool release_twi);
 
 
 uint8_t        twi_start();
-void    inline twi_stop();
+void 		twi_stop();
 
 /*
  * DS1803 routines

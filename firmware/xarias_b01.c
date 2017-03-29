@@ -265,7 +265,7 @@ int main()
 }
 
 
-SIGNAL(SIG_INTERRUPT0)
+ISR(INT0_vect)
 {
 	static uint64_t passed_inj_ticks=0;
 
@@ -335,7 +335,7 @@ SIGNAL(SIG_INTERRUPT0)
 }
 
 
-SIGNAL(SIG_OVERFLOW0)
+ISR(TIMER0_OVF_vect)
 {
 	tcnt0_overs++;
 	tcnt0_overs_sec++;

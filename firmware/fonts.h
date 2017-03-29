@@ -7,7 +7,7 @@
 /*
  * Font 5x7 mapping table
  */
-const prog_uint8_t *font5x7[128] = {NULL};
+const uint8_t *font5x7[128] = {NULL};
 
 void init_font5x7()
 {
@@ -119,9 +119,10 @@ void init_font5x7()
 
 
 /*
- * Font 16x24 apping table
+ * Font 16x24 mapping table
  */
-const prog_uint8_t *font16x24[64] = {NULL};
+const uint8_t *font16x24[64] = {NULL};
+//const uint8_t  * const font16x24[64] __attribute__ ((progmem)) = {NULL} ;
 
 void init_font16x24()
 {

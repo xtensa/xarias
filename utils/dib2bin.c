@@ -191,7 +191,7 @@ int main(int argv, char** argc)
 				fread(buf,1,4,f);
 				buf[4]=0;
 				bfSize=TONUM4(buf);
-				printf("           bfSize: %ld\n",bfSize);
+				printf("           bfSize: %d\n",bfSize);
 							
 				fread(buf,1,2,f);
 				buf[2]=0;
@@ -204,7 +204,7 @@ int main(int argv, char** argc)
 				fread(buf,1,4,f);
 				buf[4]=0;
 				bfOffBits=TONUM4(buf);  
-				printf("        bfOffBits: %ld\n",bfOffBits);
+				printf("        bfOffBits: %d\n",bfOffBits);
 							
 			
 				printf("Reading info header\n");
@@ -216,12 +216,12 @@ int main(int argv, char** argc)
 				fread(buf,1,4,f);
 				buf[4]=0;
 				biWidth=TONUM4(buf);
-				printf("          biWidth: %ld\n",biWidth);
+				printf("          biWidth: %d\n",biWidth);
 				
 				fread(buf,1,4,f);
 				buf[4]=0;
 				biHeight=TONUM4(buf);
-				printf("         biHeight: %ld\n",biHeight);
+				printf("         biHeight: %d\n",biHeight);
 				
 				fread(buf,1,2,f);
 				buf[2]=0;
@@ -230,17 +230,17 @@ int main(int argv, char** argc)
 				fread(buf,1,2,f);
 				buf[2]=0;
 				biBitCount=TONUM2(buf);
-				printf("       biBitCount: %ld\n",biBitCount);
+				printf("       biBitCount: %d\n",biBitCount);
 					
 				fread(buf,1,4,f);
 				buf[4]=0;
 				biCompression=TONUM4(buf);
-				printf("    biCompression: %ld\n",biCompression);
+				printf("    biCompression: %d\n",biCompression);
 					
 				fread(buf,1,4,f);
 				buf[4]=0;
 				biSizeImage=TONUM4(buf);
-				printf("      biSizeImage: %ld\n",biSizeImage);
+				printf("      biSizeImage: %d\n",biSizeImage);
 						
 				fread(buf,1,4,f);
 				buf[4]=0;
@@ -322,7 +322,7 @@ int main(int argv, char** argc)
 					}
 					default:
 					{
-						printf("%ld-bit mode is not supported\n",biBitCount);
+						printf("%d-bit mode is not supported\n",biBitCount);
 					}
 				}
 								

@@ -51,7 +51,7 @@ LIBS           =
 CC             = avr-gcc 
 
 CFLAGS         = -g -Wall $(OPTIMIZE) -ffunction-sections ${DEFS}
-LDFLAGS        = -Wl,--gc-sections,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.19/
+LDFLAGS        = -Wl,--gc-sections,-Map,$(PRG).map -L /usr/lib/binutils/avr/2.27/
 
 OBJCOPY        = avr-objcopy
 OBJDUMP        = avr-objdump

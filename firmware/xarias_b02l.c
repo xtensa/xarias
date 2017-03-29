@@ -918,7 +918,7 @@ int main()
 	uint8_t kb_sth_pressed;
 	uint8_t ac_pressed=0;
 	
-	uint16_t m_speed_m=0, m_speed_km=0, avg_speed_m=0, avg_speed_km=0;
+	uint16_t m_speed_m=0, m_speed_km=0, /* avg_speed_m=0,*/ avg_speed_km=0;
 	uint16_t m_fuel_h=0, m_fuel_100=0, avg_fuel_h=0, avg_fuel_100=0;
 	uint32_t passed_distance=0;
 
@@ -1603,7 +1603,7 @@ while(f==g)
 				{
 					avg_fuel_h   = tot_fuel * (3600000/divisor) / (passed_seconds/divisor);
 					avg_fuel_100 = tot_fuel * (100000/divisor) / (passed_distance/divisor);
-					avg_speed_m  = passed_distance / passed_seconds;
+					//avg_speed_m  = passed_distance / passed_seconds;
 					avg_speed_km = passed_distance * 36 / (passed_seconds*10);
 				}
 	
@@ -2226,7 +2226,7 @@ while(f==g)
 }
 
 
-SIGNAL(SIG_INTERRUPT0)
+ISR(INT0_vect)
 {
 	uint8_t pin_inj_state=PIN_INJ, tcnt0, pin_lights_state=PIN_LIGHTS;
 	static uint16_t inj_ticks;
@@ -2332,7 +2332,7 @@ SIGNAL(SIG_INTERRUPT0)
 	}
 }
 
-SIGNAL(SIG_INTERRUPT2)
+ISR(INT2_vect)
 {
 	uint8_t old_progpart=prog_part;
 
@@ -2355,13 +2355,13 @@ SIGNAL(SIG_INTERRUPT2)
 }
 
 
-SIGNAL(SIG_OVERFLOW0)
+ISR(TIMER0_OVF_vect)
 {
 	tcnt0_overs++;
 	tcnt0_overs_sec++;
 }
 
-SIGNAL(SIG_OVERFLOW1)
+ISR(TIMER1_OVF_vect)
 {
 	error(ERROR_RPM_COUNTER_OVERFLOW);
 }

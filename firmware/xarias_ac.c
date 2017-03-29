@@ -327,7 +327,8 @@ int main()
 
 	return 0;
 }
-SIGNAL(SIG_2WIRE_SERIAL)
+
+ISR(TWI_vect)
 {
 	static volatile uint8_t byte_no, cmd=AC_CMD_NOP, params[MAX_PARAMS_CNT], ret_vals[MAX_RET_VALS_CNT], ret_vals_cnt;
 	int32_t temperature;
@@ -476,7 +477,7 @@ SIGNAL(SIG_2WIRE_SERIAL)
 /*
  * Main clock interrupt
  */
-SIGNAL(SIG_INTERRUPT0)
+ISR(INT0_vect)
 {
 	static uint16_t clock_ticks=0;
 	uint8_t i;
